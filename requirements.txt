@@ -1,0 +1,59 @@
+# ========================================
+# DISTRIBUIDORA VELANDIAX - DEPENDENCIAS
+# ========================================
+
+# FRAMEWORK WEB
+FastAPI==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# BASE DE DATOS
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.23
+
+# SEGURIDAD Y AUTENTICACIÓN
+PyJWT==2.13.0
+bcrypt==4.1.1
+python-jose[cryptography]==3.3.0
+
+# VALIDACIÓN Y SERIALIZACIÓN
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# VARIABLES DE ENTORNO
+python-dotenv==1.0.0
+
+# UTILIDADES
+requests==2.31.0
+httpx==0.25.2
+
+# API EXTERNA (WhatsApp)
+twilio==8.10.0  # Alternativa a Meta Cloud API
+
+# EMAIL
+python-dateutil==2.8.2
+email-validator==2.1.0
+
+# CORS y SEGURIDAD
+starlette==0.27.0
+
+# TESTING
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+
+# LOGGING
+python-json-logger==2.0.7
+
+# AWS S3 (Opcional para almacenamiento de imágenes)
+boto3==1.29.7
+
+# DESARROLLO (Opcional)
+black==23.12.0
+flake8==6.1.0
+isort==5.13.2
+mypy==1.7.1
+
+# DOCUMENTACIÓN API
+mkdocs==1.5.3
+mkdocs-material==9.4.14
