@@ -4,28 +4,29 @@ from database.connection import get_connection
 from routes.admin import verificar_admin
 from schemas.categoria import CategoriaCreate, CategoriaResponse, CategoriaUpdate
 
-router = APIRouter(prefix="/admin/categorias", tags=["categorias"])
+router = APIRouter(tags=["categorias"])
 
 
 def _serializar_categoria(fila):
     return {
         "id_categoria": fila[0],
-        "nombre_categoria": fila[1],
-        "activa": fila[2],
+        "nombre": fila[1],
+        "descripcion": fila[2],
     }
 
 
-@router.get("", response_model=list[CategoriaResponse])
-def listar_categorias(usuario: dict = Depends(verificar_admin)):
+@router.get("/categorias", response_model=list[CategoriaResponse])
+@router.get("/admin/categorias", response_model=list[CategoriaResponse])
+def listar_categorias():
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
         cursor.execute(
             """
-            SELECT id_categoria, nombre_categoria, activa
-            FROM categorias
-            ORDER BY nombre_categoria
+            SELECT id_categoria, nombre, descripcion
+            FROM categoria
+            ORDER BY nombre
             """
         )
         return [_serializar_categoria(fila) for fila in cursor.fetchall()]
@@ -34,8 +35,37 @@ def listar_categorias(usuario: dict = Depends(verificar_admin)):
         conn.close()
 
 
+@router.get("/categorias/{id_categoria}", response_model=CategoriaResponse)
+@router.get("/admin/categorias/{id_categoria}", response_model=CategoriaResponse)
+def obtener_categoria(id_categoria: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            """
+            SELECT id_categoria, nombre, descripcion
+            FROM categoria
+            WHERE id_categoria = %s
+            """,
+            (id_categoria,),
+        )
+        fila = cursor.fetchone()
+    finally:
+        cursor.close()
+        conn.close()
+
+    if not fila:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Categoria no encontrada",
+        )
+
+    return _serializar_categoria(fila)
+
+
 @router.post(
-    "",
+    "/admin/categorias",
     response_model=CategoriaResponse,
     status_code=status.HTTP_201_CREATED,
 )
@@ -49,15 +79,15 @@ def crear_categoria(
     try:
         cursor.execute(
             """
-            INSERT INTO categorias (nombre_categoria)
-            VALUES (%s)
-            RETURNING id_categoria, nombre_categoria, activa
+            INSERT INTO categoria (nombre, descripcion)
+            VALUES (%s, %s)
+            RETURNING id_categoria, nombre, descripcion
             """,
-            (categoria.nombre_categoria,),
+            (categoria.nombre, categoria.descripcion),
         )
-        categoria_creada = _serializar_categoria(cursor.fetchone())
+        creada = _serializar_categoria(cursor.fetchone())
         conn.commit()
-        return categoria_creada
+        return creada
     except Exception as exc:
         conn.rollback()
         raise HTTPException(
@@ -69,7 +99,7 @@ def crear_categoria(
         conn.close()
 
 
-@router.put("/{id_categoria}", response_model=CategoriaResponse)
+@router.put("/admin/categorias/{id_categoria}", response_model=CategoriaResponse)
 def actualizar_categoria(
     id_categoria: int,
     categoria: CategoriaUpdate,
@@ -90,10 +120,10 @@ def actualizar_categoria(
     try:
         cursor.execute(
             f"""
-            UPDATE categorias
+            UPDATE categoria
             SET {", ".join(asignaciones)}
             WHERE id_categoria = %s
-            RETURNING id_categoria, nombre_categoria, activa
+            RETURNING id_categoria, nombre, descripcion
             """,
             parametros,
         )
@@ -120,8 +150,8 @@ def actualizar_categoria(
         conn.close()
 
 
-@router.delete("/{id_categoria}", response_model=CategoriaResponse)
-def desactivar_categoria(
+@router.delete("/admin/categorias/{id_categoria}", response_model=dict)
+def eliminar_categoria(
     id_categoria: int,
     usuario: dict = Depends(verificar_admin),
 ):
@@ -131,10 +161,9 @@ def desactivar_categoria(
     try:
         cursor.execute(
             """
-            UPDATE categorias
-            SET activa = false
+            DELETE FROM categoria
             WHERE id_categoria = %s
-            RETURNING id_categoria, nombre_categoria, activa
+            RETURNING id_categoria
             """,
             (id_categoria,),
         )
@@ -146,11 +175,16 @@ def desactivar_categoria(
             )
 
         conn.commit()
-        return _serializar_categoria(fila)
+        return {"success": True, "id_categoria": fila[0]}
     except HTTPException:
         conn.rollback()
         raise
+    except Exception as exc:
+        conn.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"No fue posible eliminar la categoria: {exc}",
+        ) from exc
     finally:
         cursor.close()
         conn.close()
-

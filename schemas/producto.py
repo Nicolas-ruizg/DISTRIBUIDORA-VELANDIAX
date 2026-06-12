@@ -1,51 +1,67 @@
 from decimal import Decimal
-from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
 
-class ModalidadVentaEnum(str, Enum):
-    SOLO_MINORISTA = "SOLO_MINORISTA"
-    SOLO_MAYORISTA = "SOLO_MAYORISTA"
-    AMBAS = "AMBAS"
-
-
 class ProductoCreate(BaseModel):
-    id_categoria: Optional[int] = Field(None, gt=0)
-    nombre_prenda: str = Field(min_length=2, max_length=150)
-    descripcion: Optional[str] = Field(None, max_length=1000)
-    url_imagen: Optional[str] = Field(None, max_length=500)
-    modalidad_venta: ModalidadVentaEnum = ModalidadVentaEnum.AMBAS
-    precio_lista: Decimal = Field(gt=0)
-    precio_minorista: Decimal = Field(gt=0)
-    precio_mayorista: Decimal = Field(gt=0)
-    url_producto: Optional[str] = Field(None, max_length=500)
+    id_categoria: int = Field(gt=0)
+    nombre: str = Field(min_length=2, max_length=160)
+    descripcion: Optional[str] = None
+    paquete_estatico: bool = False
 
 
 class ProductoUpdate(BaseModel):
     id_categoria: Optional[int] = Field(None, gt=0)
-    nombre_prenda: Optional[str] = Field(None, min_length=2, max_length=150)
-    descripcion: Optional[str] = Field(None, max_length=1000)
-    url_imagen: Optional[str] = Field(None, max_length=500)
-    modalidad_venta: Optional[ModalidadVentaEnum] = None
-    precio_lista: Optional[Decimal] = Field(None, gt=0)
-    precio_minorista: Optional[Decimal] = Field(None, gt=0)
-    precio_mayorista: Optional[Decimal] = Field(None, gt=0)
-    activo: Optional[bool] = None
-    url_producto: Optional[str] = Field(None, max_length=500)
+    nombre: Optional[str] = Field(None, min_length=2, max_length=160)
+    descripcion: Optional[str] = None
+    paquete_estatico: Optional[bool] = None
 
 
-class ProductoResponse(BaseModel):
+class VarianteCreate(BaseModel):
+    precio_costo: Decimal = Field(ge=0)
+    precio_minorista: Decimal = Field(ge=0)
+    precio_mayorista: Decimal = Field(ge=0)
+    peso: Optional[Decimal] = Field(None, ge=0)
+    aplica_paquete: bool = False
+    atributos: dict[str, Any] = Field(default_factory=dict)
+
+
+class VarianteUpdate(BaseModel):
+    precio_costo: Optional[Decimal] = Field(None, ge=0)
+    precio_minorista: Optional[Decimal] = Field(None, ge=0)
+    precio_mayorista: Optional[Decimal] = Field(None, ge=0)
+    peso: Optional[Decimal] = Field(None, ge=0)
+    aplica_paquete: Optional[bool] = None
+    atributos: Optional[dict[str, Any]] = None
+
+
+class ProductoResumenResponse(BaseModel):
     id_producto: int
-    id_categoria: Optional[int]
-    nombre_prenda: str
-    descripcion: Optional[str]
-    url_imagen: Optional[str]
-    modalidad_venta: ModalidadVentaEnum
-    precio_lista: Decimal
+    id_categoria: int
+    categoria: str
+    nombre: str
+    descripcion: Optional[str] = None
+    paquete_estatico: bool
+    variantes: int
+    precio_desde: Optional[Decimal] = None
+
+
+class VarianteProductoResponse(BaseModel):
+    id_variante: int
+    precio_costo: Decimal
     precio_minorista: Decimal
     precio_mayorista: Decimal
-    activo: bool
-    url_producto: Optional[str]
+    peso: Optional[Decimal] = None
+    aplica_paquete: bool
+    atributos: dict[str, Any]
 
+
+class ProductoDetalleResponse(BaseModel):
+    id_producto: int
+    id_categoria: int
+    categoria: str
+    nombre: str
+    descripcion: Optional[str] = None
+    paquete_estatico: bool
+    variantes: list[VarianteProductoResponse]
