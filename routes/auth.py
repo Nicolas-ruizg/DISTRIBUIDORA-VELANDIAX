@@ -1,8 +1,12 @@
-import hmac
-import os
+from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, status
+import bcrypt
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
+from database.connection import get_db
+from database.models import Usuario
 from schemas.auth_schema import AdminLoginRequest, AdminLoginResponse
 from utils.jwt_handler import crear_token
 
@@ -10,32 +14,38 @@ router = APIRouter(prefix="/admin", tags=["auth"])
 
 
 @router.post("/login", response_model=AdminLoginResponse)
-def admin_login(data: AdminLoginRequest):
-    admin_email = os.getenv("ADMIN_EMAIL")
-    admin_password = os.getenv("ADMIN_PASSWORD")
-
-    if not admin_email or not admin_password:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Credenciales admin no configuradas",
+def admin_login(data: AdminLoginRequest, db: Session = Depends(get_db)):
+    usuario_db = db.scalar(
+        select(Usuario).where(
+            func.lower(Usuario.email) == data.email.strip().lower(),
+            Usuario.activo.is_(True),
         )
+    )
 
-    email_ok = hmac.compare_digest(data.email.strip().lower(), admin_email.lower())
-    password_ok = hmac.compare_digest(data.password, admin_password)
-
-    if not email_ok or not password_ok:
+    if not usuario_db or not bcrypt.checkpw(
+        data.password.encode(),
+        usuario_db.password_hash.encode(),
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales invalidas",
         )
 
-    usuario = {
-        "id_usuario": 1,
-        "nombre": "Administrador",
-        "email": admin_email,
-        "rol": "ADMINISTRADOR",
-    }
+    if usuario_db.rol != "ADMINISTRADOR":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El usuario no tiene permisos de administrador",
+        )
 
+    usuario_db.ultimo_acceso = datetime.now()
+    db.commit()
+
+    usuario = {
+        "id_usuario": usuario_db.id_usuario,
+        "nombre": usuario_db.nombre,
+        "email": usuario_db.email,
+        "rol": usuario_db.rol,
+    }
     return {
         "success": True,
         "token": crear_token(usuario),

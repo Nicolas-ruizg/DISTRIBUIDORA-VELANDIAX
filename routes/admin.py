@@ -2,8 +2,11 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, joinedload
 
-from database.connection import get_connection
+from database.connection import get_db
+from database.models import Cliente, Pedido, Producto, VarianteProducto
 from utils.jwt_handler import verificar_token
 
 router = APIRouter()
@@ -33,60 +36,38 @@ def verificar_admin(credentials: HTTPAuthorizationCredentials = Depends(security
 
 
 @router.get("/admin/dashboard")
-def dashboard(usuario: dict = Depends(verificar_admin)):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute("SELECT COUNT(*) FROM clientes")
-        total_clientes = cursor.fetchone()[0]
-
-        cursor.execute("SELECT COUNT(*) FROM producto")
-        total_productos = cursor.fetchone()[0]
-
-        cursor.execute("SELECT COUNT(*) FROM variantes_producto")
-        total_variantes = cursor.fetchone()[0]
-
-        cursor.execute("SELECT COUNT(*) FROM pedido")
-        total_pedidos = cursor.fetchone()[0]
-
-        cursor.execute("SELECT COALESCE(SUM(total), 0) FROM pedido")
-        total_vendido = cursor.fetchone()[0]
-
-        cursor.execute(
-            """
-            SELECT p.id_pedido, c.nombre, p.estado, p.total, p.fecha
-            FROM pedido p
-            JOIN clientes c ON c.id_cliente = p.id_cliente
-            ORDER BY p.fecha DESC, p.id_pedido DESC
-            LIMIT 5
-            """
-        )
-        pedidos_recientes = [
-            {
-                "id_pedido": fila[0],
-                "cliente": fila[1],
-                "estado": fila[2],
-                "total": fila[3],
-                "fecha": fila[4],
-            }
-            for fila in cursor.fetchall()
-        ]
-    finally:
-        cursor.close()
-        conn.close()
+def dashboard(
+    usuario: dict = Depends(verificar_admin),
+    db: Session = Depends(get_db),
+):
+    pedidos = db.scalars(
+        select(Pedido)
+        .options(joinedload(Pedido.cliente))
+        .order_by(Pedido.fecha.desc(), Pedido.id_pedido.desc())
+        .limit(5)
+    ).all()
 
     return {
         "success": True,
         "usuario": usuario,
         "metricas": {
-            "clientes": total_clientes,
-            "productos": total_productos,
-            "variantes": total_variantes,
-            "pedidos": total_pedidos,
-            "total_vendido": total_vendido,
+            "clientes": db.scalar(select(func.count()).select_from(Cliente)),
+            "productos": db.scalar(select(func.count()).select_from(Producto)),
+            "variantes": db.scalar(select(func.count()).select_from(VarianteProducto)),
+            "pedidos": db.scalar(select(func.count()).select_from(Pedido)),
+            "total_vendido": db.scalar(
+                select(func.coalesce(func.sum(Pedido.total), 0))
+            ),
         },
-        "pedidos_recientes": pedidos_recientes,
+        "pedidos_recientes": [
+            {
+                "id_pedido": pedido.id_pedido,
+                "cliente": pedido.cliente.nombre,
+                "estado": pedido.estado,
+                "total": pedido.total,
+                "fecha": pedido.fecha,
+            }
+            for pedido in pedidos
+        ],
         "timestamp": datetime.now().isoformat(),
     }
-

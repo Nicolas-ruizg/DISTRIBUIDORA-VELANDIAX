@@ -1,67 +1,41 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
-from database.connection import get_connection
+from database.connection import get_db
+from database.models import Categoria
 from routes.admin import verificar_admin
 from schemas.categoria import CategoriaCreate, CategoriaResponse, CategoriaUpdate
 
 router = APIRouter(tags=["categorias"])
 
 
-def _serializar_categoria(fila):
+def _serializar_categoria(categoria: Categoria):
     return {
-        "id_categoria": fila[0],
-        "nombre": fila[1],
-        "descripcion": fila[2],
+        "id_categoria": categoria.id_categoria,
+        "nombre": categoria.nombre,
+        "descripcion": categoria.descripcion,
     }
 
 
 @router.get("/categorias", response_model=list[CategoriaResponse])
 @router.get("/admin/categorias", response_model=list[CategoriaResponse])
-def listar_categorias():
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute(
-            """
-            SELECT id_categoria, nombre, descripcion
-            FROM categoria
-            ORDER BY nombre
-            """
-        )
-        return [_serializar_categoria(fila) for fila in cursor.fetchall()]
-    finally:
-        cursor.close()
-        conn.close()
+def listar_categorias(db: Session = Depends(get_db)):
+    categorias = db.scalars(select(Categoria).order_by(Categoria.nombre)).all()
+    return [_serializar_categoria(categoria) for categoria in categorias]
 
 
 @router.get("/categorias/{id_categoria}", response_model=CategoriaResponse)
 @router.get("/admin/categorias/{id_categoria}", response_model=CategoriaResponse)
-def obtener_categoria(id_categoria: int):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute(
-            """
-            SELECT id_categoria, nombre, descripcion
-            FROM categoria
-            WHERE id_categoria = %s
-            """,
-            (id_categoria,),
-        )
-        fila = cursor.fetchone()
-    finally:
-        cursor.close()
-        conn.close()
-
-    if not fila:
+def obtener_categoria(id_categoria: int, db: Session = Depends(get_db)):
+    categoria = db.get(Categoria, id_categoria)
+    if not categoria:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Categoria no encontrada",
         )
-
-    return _serializar_categoria(fila)
+    return _serializar_categoria(categoria)
 
 
 @router.post(
@@ -72,31 +46,23 @@ def obtener_categoria(id_categoria: int):
 def crear_categoria(
     categoria: CategoriaCreate,
     usuario: dict = Depends(verificar_admin),
+    db: Session = Depends(get_db),
 ):
-    conn = get_connection()
-    cursor = conn.cursor()
-
+    categoria_db = Categoria(
+        nombre=categoria.nombre,
+        descripcion=categoria.descripcion,
+    )
+    db.add(categoria_db)
     try:
-        cursor.execute(
-            """
-            INSERT INTO categoria (nombre, descripcion)
-            VALUES (%s, %s)
-            RETURNING id_categoria, nombre, descripcion
-            """,
-            (categoria.nombre, categoria.descripcion),
-        )
-        creada = _serializar_categoria(cursor.fetchone())
-        conn.commit()
-        return creada
-    except Exception as exc:
-        conn.rollback()
+        db.commit()
+        db.refresh(categoria_db)
+    except IntegrityError as exc:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"No fue posible crear la categoria: {exc}",
+            detail="No fue posible crear la categoria",
         ) from exc
-    finally:
-        cursor.close()
-        conn.close()
+    return _serializar_categoria(categoria_db)
 
 
 @router.put("/admin/categorias/{id_categoria}", response_model=CategoriaResponse)
@@ -104,6 +70,7 @@ def actualizar_categoria(
     id_categoria: int,
     categoria: CategoriaUpdate,
     usuario: dict = Depends(verificar_admin),
+    db: Session = Depends(get_db),
 ):
     cambios = categoria.model_dump(exclude_none=True)
     if not cambios:
@@ -112,79 +79,35 @@ def actualizar_categoria(
             detail="Debe enviar al menos un campo para actualizar",
         )
 
-    asignaciones = [f"{campo} = %s" for campo in cambios]
-    parametros = [*cambios.values(), id_categoria]
-    conn = get_connection()
-    cursor = conn.cursor()
+    categoria_db = db.get(Categoria, id_categoria)
+    if not categoria_db:
+        raise HTTPException(status_code=404, detail="Categoria no encontrada")
 
+    for campo, valor in cambios.items():
+        setattr(categoria_db, campo, valor)
     try:
-        cursor.execute(
-            f"""
-            UPDATE categoria
-            SET {", ".join(asignaciones)}
-            WHERE id_categoria = %s
-            RETURNING id_categoria, nombre, descripcion
-            """,
-            parametros,
-        )
-        fila = cursor.fetchone()
-        if not fila:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Categoria no encontrada",
-            )
-
-        conn.commit()
-        return _serializar_categoria(fila)
-    except HTTPException:
-        conn.rollback()
-        raise
-    except Exception as exc:
-        conn.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"No fue posible actualizar la categoria: {exc}",
-        ) from exc
-    finally:
-        cursor.close()
-        conn.close()
+        db.commit()
+        db.refresh(categoria_db)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="No fue posible actualizar la categoria") from exc
+    return _serializar_categoria(categoria_db)
 
 
 @router.delete("/admin/categorias/{id_categoria}", response_model=dict)
 def eliminar_categoria(
     id_categoria: int,
     usuario: dict = Depends(verificar_admin),
+    db: Session = Depends(get_db),
 ):
-    conn = get_connection()
-    cursor = conn.cursor()
+    categoria_db = db.get(Categoria, id_categoria)
+    if not categoria_db:
+        raise HTTPException(status_code=404, detail="Categoria no encontrada")
 
+    db.delete(categoria_db)
     try:
-        cursor.execute(
-            """
-            DELETE FROM categoria
-            WHERE id_categoria = %s
-            RETURNING id_categoria
-            """,
-            (id_categoria,),
-        )
-        fila = cursor.fetchone()
-        if not fila:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Categoria no encontrada",
-            )
-
-        conn.commit()
-        return {"success": True, "id_categoria": fila[0]}
-    except HTTPException:
-        conn.rollback()
-        raise
-    except Exception as exc:
-        conn.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"No fue posible eliminar la categoria: {exc}",
-        ) from exc
-    finally:
-        cursor.close()
-        conn.close()
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="No fue posible eliminar la categoria") from exc
+    return {"success": True, "id_categoria": id_categoria}
