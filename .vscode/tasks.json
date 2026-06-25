@@ -1,0 +1,72 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "VELANDIAX: Backend FastAPI",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m",
+        "uvicorn",
+        "main:app",
+        "--reload",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8001"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}\\DISTRIBUIDORA-VELANDIAX"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated",
+        "group": "velandiax",
+        "reveal": "always",
+        "clear": true
+      }
+    },
+    {
+      "label": "VELANDIAX: Frontend Vite",
+      "type": "shell",
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        ".\\node_modules\\vite\\bin\\vite.js",
+        "--host",
+        "localhost",
+        "--port",
+        "5173"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}\\velandiax-admin"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated",
+        "group": "velandiax",
+        "reveal": "always",
+        "clear": true
+      }
+    },
+    {
+      "label": "VELANDIAX: Front + Back",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "dependsOn": [
+        "VELANDIAX: Backend FastAPI",
+        "VELANDIAX: Frontend Vite"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "shared",
+        "group": "velandiax",
+        "reveal": "always"
+      }
+    }
+  ]
+}
