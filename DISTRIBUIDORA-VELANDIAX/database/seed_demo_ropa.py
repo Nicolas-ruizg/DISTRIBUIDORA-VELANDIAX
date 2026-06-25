@@ -179,9 +179,9 @@ def slug(texto: str) -> str:
 def crear_png(titulo: str, subtitulo: str, color: str) -> bytes:
     image = Image.new("RGB", (800, 1000), color)
     draw = ImageDraw.Draw(image)
-    title_font = ImageFont.truetype("arial.ttf", 54)
-    subtitle_font = ImageFont.truetype("arial.ttf", 30)
-    brand_font = ImageFont.truetype("arial.ttf", 26)
+    title_font = cargar_fuente(54)
+    subtitle_font = cargar_fuente(30)
+    brand_font = cargar_fuente(26)
 
     draw.rectangle((55, 55, 745, 945), outline="white", width=5)
     draw.rectangle((90, 120, 710, 720), fill="#FFFFFF")
@@ -193,6 +193,20 @@ def crear_png(titulo: str, subtitulo: str, color: str) -> bytes:
     output = BytesIO()
     image.save(output, format="PNG", optimize=True)
     return output.getvalue()
+
+
+def cargar_fuente(size: int):
+    fuentes = [
+        "arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
+    ]
+    for fuente in fuentes:
+        try:
+            return ImageFont.truetype(fuente, size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
 
 
 def subir_imagen(carpeta: str, nombre: str, titulo: str, subtitulo: str, color: str) -> str:
@@ -370,6 +384,7 @@ def cargar_base(imagenes_producto, imagenes_variante):
             {
                 "cliente": 0,
                 "estado": "ENTREGADO",
+                "estado_pago": "PAGO_TOTAL",
                 "mayorista": False,
                 "envio": 12000,
                 "fecha": ahora - timedelta(days=4),
@@ -382,6 +397,7 @@ def cargar_base(imagenes_producto, imagenes_variante):
             {
                 "cliente": 1,
                 "estado": "EN_TRANSITO",
+                "estado_pago": "PAGO_50",
                 "mayorista": True,
                 "envio": 18000,
                 "fecha": ahora - timedelta(days=2),
@@ -395,6 +411,7 @@ def cargar_base(imagenes_producto, imagenes_variante):
             {
                 "cliente": 2,
                 "estado": "PREPARANDO",
+                "estado_pago": "PAGO_TOTAL",
                 "mayorista": False,
                 "envio": 10000,
                 "fecha": ahora - timedelta(hours=8),
@@ -411,6 +428,7 @@ def cargar_base(imagenes_producto, imagenes_variante):
             pedido = Pedido(
                 id_cliente=clientes[venta["cliente"]].id_cliente,
                 estado=venta["estado"],
+                estado_pago=venta["estado_pago"],
                 total=Decimal("0"),
                 precio_envio=Decimal(str(venta["envio"])),
                 es_mayorista=venta["mayorista"],
