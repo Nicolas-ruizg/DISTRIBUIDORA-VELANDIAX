@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from database.connection import get_db
 from database.models import Usuario
+from routes.admin import ROLES_VALIDOS
 from routes.admin import verificar_admin
 from schemas.usuario import UsuarioCreate, UsuarioResponse, UsuarioUpdate
 
@@ -22,6 +23,13 @@ def _serializar_usuario(usuario: Usuario):
         "fecha_creacion": usuario.fecha_creacion,
         "ultimo_acceso": usuario.ultimo_acceso,
     }
+
+
+def _normalizar_rol(rol: str) -> str:
+    rol_normalizado = rol.strip().upper()
+    if rol_normalizado not in ROLES_VALIDOS:
+        raise HTTPException(status_code=400, detail="Rol de usuario invalido")
+    return rol_normalizado
 
 
 @router.get("", response_model=list[UsuarioResponse])
@@ -58,7 +66,7 @@ def crear_usuario(
             nuevo_usuario.password.encode(),
             bcrypt.gensalt(),
         ).decode(),
-        rol="ADMINISTRADOR",
+        rol=_normalizar_rol(nuevo_usuario.rol),
         activo=True,
     )
     db.add(usuario_db)
@@ -99,6 +107,8 @@ def actualizar_usuario(
         ).decode()
     if "email" in cambios:
         cambios["email"] = cambios["email"].lower()
+    if "rol" in cambios:
+        cambios["rol"] = _normalizar_rol(cambios["rol"])
     for campo, valor in cambios.items():
         setattr(usuario_db, campo, valor)
 

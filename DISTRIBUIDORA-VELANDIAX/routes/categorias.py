@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from database.connection import get_db
 from database.models import Categoria
-from routes.admin import verificar_admin
+from routes.admin import verificar_inventario
 from schemas.categoria import CategoriaCreate, CategoriaResponse, CategoriaUpdate
 
 router = APIRouter(tags=["categorias"])
@@ -45,7 +45,7 @@ def obtener_categoria(id_categoria: int, db: Session = Depends(get_db)):
 )
 def crear_categoria(
     categoria: CategoriaCreate,
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
     categoria_db = Categoria(
@@ -69,7 +69,7 @@ def crear_categoria(
 def actualizar_categoria(
     id_categoria: int,
     categoria: CategoriaUpdate,
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
     cambios = categoria.model_dump(exclude_none=True)
@@ -97,7 +97,7 @@ def actualizar_categoria(
 @router.delete("/admin/categorias/{id_categoria}", response_model=dict)
 def eliminar_categoria(
     id_categoria: int,
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
     categoria_db = db.get(Categoria, id_categoria)

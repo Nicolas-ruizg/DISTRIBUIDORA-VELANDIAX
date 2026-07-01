@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, User, AlertCircle } from 'lucide-react';
 import apiClient from '../../api/axios';
+import { getDefaultAdminPath, setAuthUser } from '../../utils/auth';
 
 export const LoginView = () => {
   // 1. Cambiamos 'username' por 'email'
@@ -29,7 +30,8 @@ export const LoginView = () => {
       
       if (token) {
         localStorage.setItem('admin_token', token);
-        navigate('/admin/dashboard', { replace: true });
+        setAuthUser(response.data.usuario);
+        navigate(getDefaultAdminPath(response.data.usuario?.rol), { replace: true });
       } else {
         setError('El servidor no devolvió un token de acceso válido.');
       }

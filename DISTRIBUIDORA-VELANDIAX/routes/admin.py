@@ -12,12 +12,19 @@ from utils.jwt_handler import verificar_token
 router = APIRouter()
 security = HTTPBearer()
 
+ROL_ADMIN = "ADMINISTRADOR"
+ROL_VENDEDOR = "VENDEDOR"
+ROL_INVENTARIO = "INVENTARIO"
+ROLES_VALIDOS = {ROL_ADMIN, ROL_VENDEDOR, ROL_INVENTARIO}
 
-def es_rol_admin(rol) -> bool:
-    return str(rol).strip().upper() in {"1", "ADMIN", "ADMINISTRADOR"}
+
+def normalizar_rol(rol) -> str:
+    return str(rol or "").strip().upper()
 
 
-def verificar_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
+def verificar_usuario_autenticado(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
     usuario = verificar_token(credentials.credentials)
 
     if not usuario:
@@ -26,13 +33,26 @@ def verificar_admin(credentials: HTTPAuthorizationCredentials = Depends(security
             detail="Token invalido o expirado",
         )
 
-    if not es_rol_admin(usuario.get("rol")):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. Solo administradores pueden realizar esta accion",
-        )
-
     return usuario
+
+
+def requerir_roles(*roles_permitidos: str):
+    roles = {normalizar_rol(rol) for rol in roles_permitidos}
+
+    def _verificar(usuario: dict = Depends(verificar_usuario_autenticado)):
+        if normalizar_rol(usuario.get("rol")) not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acceso denegado para este rol",
+            )
+        return usuario
+
+    return _verificar
+
+
+verificar_admin = requerir_roles(ROL_ADMIN)
+verificar_inventario = requerir_roles(ROL_ADMIN, ROL_INVENTARIO)
+verificar_ventas = requerir_roles(ROL_ADMIN, ROL_VENDEDOR)
 
 
 @router.get("/admin/dashboard")

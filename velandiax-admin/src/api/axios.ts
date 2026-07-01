@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearAuth } from '../utils/auth';
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -28,7 +29,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('admin_token');
+      clearAuth();
       window.location.href = '/admin/login'; // Redirigimos al login forzosamente
     }
     return Promise.reject(error);

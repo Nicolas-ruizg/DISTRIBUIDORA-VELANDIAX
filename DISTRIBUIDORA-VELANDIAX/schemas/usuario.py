@@ -8,6 +8,7 @@ class UsuarioCreate(BaseModel):
     nombre: str = Field(min_length=2, max_length=150)
     email: str = Field(pattern=r"^[\w.+'-]+@[\w.-]+\.[A-Za-z]{2,}$", max_length=160)
     password: str = Field(min_length=8, max_length=128)
+    rol: str = Field(default="ADMINISTRADOR", pattern="^(ADMINISTRADOR|VENDEDOR|INVENTARIO)$")
 
 
 class UsuarioUpdate(BaseModel):
@@ -18,6 +19,7 @@ class UsuarioUpdate(BaseModel):
         max_length=160,
     )
     password: Optional[str] = Field(None, min_length=8, max_length=128)
+    rol: Optional[str] = Field(None, pattern="^(ADMINISTRADOR|VENDEDOR|INVENTARIO)$")
     activo: Optional[bool] = None
 
 

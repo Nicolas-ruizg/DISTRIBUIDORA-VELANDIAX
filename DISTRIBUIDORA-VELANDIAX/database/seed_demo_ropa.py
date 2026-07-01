@@ -314,9 +314,10 @@ def cargar_base(imagenes_producto, imagenes_variante):
 
         productos = {}
         variantes = {}
-        for data in PRODUCTOS:
+        for indice, data in enumerate(PRODUCTOS, start=1):
             producto = Producto(
                 id_categoria=categorias[data["categoria"]].id_categoria,
+                codigo_producto=f"VX-{indice:03d}",
                 nombre=data["nombre"],
                 descripcion=data["descripcion"],
                 paquete_estatico=data.get("paquete_estatico", False),

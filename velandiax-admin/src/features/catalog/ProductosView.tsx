@@ -73,7 +73,7 @@ export const ProductosView = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
-                  <th className="p-4 font-medium">ID</th>
+                  <th className="p-4 font-medium">Codigo</th>
                   <th className="p-4 font-medium">Producto</th>
                   <th className="p-4 font-medium">Categoría</th>
                   <th className="p-4 font-medium text-center">Variantes</th>
@@ -88,7 +88,7 @@ export const ProductosView = () => {
                 ) : (
                   productos.map((producto) => (
                     <tr key={producto.id_producto} className={`transition-colors ${producto.estado === 'INACTIVO' ? 'bg-slate-50 opacity-70' : 'hover:bg-slate-50'}`}>
-                      <td className="p-4 text-sm font-bold text-slate-900">#{producto.id_producto}</td>
+                      <td className="p-4 text-sm font-bold text-slate-900">{producto.codigo_producto}</td>
                       
                       {/* --- CELDA CON MINIATURA DE IMAGEN --- */}
                       <td className="p-4 text-sm">

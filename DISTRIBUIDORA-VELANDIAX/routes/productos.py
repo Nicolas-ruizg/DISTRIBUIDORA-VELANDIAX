@@ -15,7 +15,7 @@ from database.models import (
     Producto,
     VarianteProducto,
 )
-from routes.admin import verificar_admin
+from routes.admin import verificar_inventario
 from schemas.producto import (
     ImagenProductoCreate,
     ImagenProductoResponse,
@@ -199,6 +199,7 @@ def _serializar_producto_resumen(
     precios = [variante.precio_minorista for variante in variantes]
     return {
         "id_producto": producto.id_producto,
+        "codigo_producto": producto.codigo_producto,
         "id_categoria": producto.id_categoria,
         "categoria": producto.categoria.nombre,
         "nombre": producto.nombre,
@@ -244,6 +245,7 @@ def _serializar_producto_detalle(
 ):
     return {
         "id_producto": producto.id_producto,
+        "codigo_producto": producto.codigo_producto,
         "id_categoria": producto.id_categoria,
         "categoria": producto.categoria.nombre,
         "nombre": producto.nombre,
@@ -267,6 +269,16 @@ def _serializar_producto_detalle(
             )
         ],
     }
+
+
+def _normalizar_codigo_producto(codigo: str) -> str:
+    codigo_normalizado = codigo.strip().upper()
+    if not codigo_normalizado:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El codigo del producto es obligatorio",
+        )
+    return codigo_normalizado
 
 
 def _consultar_producto(
@@ -344,7 +356,7 @@ def listar_productos_admin(
     incluir_paquetes: bool = True,
     incluir_inactivos: bool = True,
     incluir_variantes_inactivas: bool = True,
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
     return _listar_productos(
@@ -364,7 +376,7 @@ def obtener_producto(id_producto: int, db: Session = Depends(get_db)):
 @router.get("/admin/productos/{id_producto}", response_model=ProductoDetalleResponse)
 def obtener_producto_admin(
     id_producto: int,
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
     return _serializar_producto_detalle(
@@ -381,10 +393,12 @@ def obtener_producto_admin(
 )
 def crear_producto(
     producto: ProductoCreate,
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
-    producto_db = Producto(**producto.model_dump())
+    datos = producto.model_dump()
+    datos["codigo_producto"] = _normalizar_codigo_producto(datos["codigo_producto"])
+    producto_db = Producto(**datos)
     db.add(producto_db)
     try:
         db.commit()
@@ -406,7 +420,7 @@ def crear_producto(
 def actualizar_producto(
     id_producto: int,
     producto: ProductoUpdate,
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
     cambios = producto.model_dump(exclude_unset=True)
@@ -419,6 +433,10 @@ def actualizar_producto(
     producto_db = db.get(Producto, id_producto)
     if not producto_db:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    if "codigo_producto" in cambios:
+        cambios["codigo_producto"] = _normalizar_codigo_producto(
+            cambios["codigo_producto"],
+        )
     for campo, valor in cambios.items():
         setattr(producto_db, campo, valor)
 
@@ -456,7 +474,7 @@ def _desmarcar_imagenes_principales(db: Session, id_producto: int):
 def crear_imagen_producto(
     id_producto: int,
     imagen: ImagenProductoCreate,
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
     producto_db = db.get(Producto, id_producto)
@@ -492,7 +510,7 @@ def subir_imagen_producto(
     es_principal: bool = Form(default=False),
     orden: int = Form(default=0),
     estado: str = Form(default="ACTIVO"),
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
     if orden < 0:
@@ -543,7 +561,7 @@ def subir_imagen_producto(
 def actualizar_imagen_producto(
     id_imagen: int,
     imagen: ImagenProductoUpdate,
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
     cambios = imagen.model_dump(exclude_none=True)
@@ -594,7 +612,7 @@ def _desmarcar_imagenes_principales_variante(db: Session, id_variante: int):
 def crear_imagen_variante(
     id_variante: int,
     imagen: ImagenVarianteCreate,
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
     variante_db = db.get(VarianteProducto, id_variante)
@@ -630,7 +648,7 @@ def subir_imagen_variante(
     es_principal: bool = Form(default=False),
     orden: int = Form(default=0),
     estado: str = Form(default="ACTIVO"),
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
     if orden < 0:
@@ -681,7 +699,7 @@ def subir_imagen_variante(
 def actualizar_imagen_variante(
     id_imagen_variante: int,
     imagen: ImagenVarianteUpdate,
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
     cambios = imagen.model_dump(exclude_none=True)
@@ -721,7 +739,7 @@ def actualizar_imagen_variante(
 def crear_variante(
     id_producto: int,
     variante: VarianteCreate,
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
     if not db.get(Producto, id_producto):
@@ -745,7 +763,7 @@ def crear_variante(
 def actualizar_variante(
     id_variante: int,
     variante: VarianteUpdate,
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
     cambios = variante.model_dump(exclude_none=True)

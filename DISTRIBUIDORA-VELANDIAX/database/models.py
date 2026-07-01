@@ -25,6 +25,12 @@ class Base(DeclarativeBase):
 
 class Usuario(Base):
     __tablename__ = "usuarios"
+    __table_args__ = (
+        CheckConstraint(
+            "rol IN ('ADMINISTRADOR', 'VENDEDOR', 'INVENTARIO')",
+            name="ck_usuarios_rol_orm",
+        ),
+    )
 
     id_usuario: Mapped[int] = mapped_column(Integer, primary_key=True)
     nombre: Mapped[str] = mapped_column(String(150), nullable=False)
@@ -61,6 +67,7 @@ class Producto(Base):
         ForeignKey("categoria.id_categoria"),
         nullable=False,
     )
+    codigo_producto: Mapped[str] = mapped_column(String(60), unique=True, nullable=False)
     nombre: Mapped[str] = mapped_column(String(200), nullable=False)
     descripcion: Mapped[str | None] = mapped_column(Text)
     paquete_estatico: Mapped[bool] = mapped_column(Boolean, default=False)

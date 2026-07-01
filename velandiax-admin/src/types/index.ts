@@ -41,6 +41,7 @@ export interface Variante {
 // --- PRODUCTOS ---
 export interface ProductoResumen {
   id_producto: number;
+  codigo_producto: string;
   id_categoria: number;
   categoria: string;
   nombre: string;
@@ -56,6 +57,7 @@ export interface ProductoResumen {
 
 export interface ProductoDetalle {
   id_producto: number;
+  codigo_producto: string;
   id_categoria: number;
   categoria: string;
   nombre: string;

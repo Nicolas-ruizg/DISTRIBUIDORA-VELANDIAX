@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from database.connection import get_db
 from database.models import Usuario
+from routes.admin import ROLES_VALIDOS
 from schemas.auth_schema import AdminLoginRequest, AdminLoginResponse
 from utils.jwt_handler import crear_token
 
@@ -31,10 +32,11 @@ def admin_login(data: AdminLoginRequest, db: Session = Depends(get_db)):
             detail="Credenciales invalidas",
         )
 
-    if usuario_db.rol != "ADMINISTRADOR":
+    rol = usuario_db.rol.strip().upper()
+    if rol not in ROLES_VALIDOS:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="El usuario no tiene permisos de administrador",
+            detail="El usuario no tiene un rol valido para ingresar",
         )
 
     usuario_db.ultimo_acceso = datetime.now()
@@ -44,7 +46,7 @@ def admin_login(data: AdminLoginRequest, db: Session = Depends(get_db)):
         "id_usuario": usuario_db.id_usuario,
         "nombre": usuario_db.nombre,
         "email": usuario_db.email,
-        "rol": usuario_db.rol,
+        "rol": rol,
     }
     return {
         "success": True,

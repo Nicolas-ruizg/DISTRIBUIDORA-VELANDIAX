@@ -6,6 +6,7 @@ import { CartProvider } from './context/CartContext';
 // Layouts
 import { AdminLayout } from './components/layout/AdminLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { RoleRoute } from './components/layout/RoleRoute';
 import { StoreLayout } from './features/storefront/StoreLayout';
 
 // Vistes Públiques (Storefront)
@@ -51,14 +52,14 @@ function App() {
         
         <Route path="/admin" element={<ProtectedRoute />}>
           <Route element={<AdminLayout />}>
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="categorias" element={<CategoriasView />} />
-            <Route path="productos" element={<ProductosView />} />
-            <Route path="productos/nuevo" element={<ProductoFormView />} />
-            <Route path="productos/:id" element={<ProductoFormView />} />
-            <Route path="pedidos" element={<PedidosView />} />
-            <Route path="pedidos/nuevo" element={<PedidoFormView />} />
-            <Route path="pedidos/:id" element={<PedidoDetalleView />} />
+            <Route path="dashboard" element={<RoleRoute allowedRoles={['ADMINISTRADOR']}><Dashboard /></RoleRoute>} />
+            <Route path="categorias" element={<RoleRoute allowedRoles={['ADMINISTRADOR', 'INVENTARIO']}><CategoriasView /></RoleRoute>} />
+            <Route path="productos" element={<RoleRoute allowedRoles={['ADMINISTRADOR', 'INVENTARIO']}><ProductosView /></RoleRoute>} />
+            <Route path="productos/nuevo" element={<RoleRoute allowedRoles={['ADMINISTRADOR', 'INVENTARIO']}><ProductoFormView /></RoleRoute>} />
+            <Route path="productos/:id" element={<RoleRoute allowedRoles={['ADMINISTRADOR', 'INVENTARIO']}><ProductoFormView /></RoleRoute>} />
+            <Route path="pedidos" element={<RoleRoute allowedRoles={['ADMINISTRADOR']}><PedidosView /></RoleRoute>} />
+            <Route path="pedidos/nuevo" element={<RoleRoute allowedRoles={['ADMINISTRADOR', 'VENDEDOR']}><PedidoFormView /></RoleRoute>} />
+            <Route path="pedidos/:id" element={<RoleRoute allowedRoles={['ADMINISTRADOR']}><PedidoDetalleView /></RoleRoute>} />
             
             <Route index element={<Navigate to="dashboard" replace />} />
           </Route>

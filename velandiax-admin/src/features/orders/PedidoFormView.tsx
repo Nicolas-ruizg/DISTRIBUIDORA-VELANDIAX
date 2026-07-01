@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Phone, Package, Plus, Trash2, Save, ShoppingCart, Truck, MapPin } from 'lucide-react';
 import apiClient from '../../api/axios';
 import type { ProductoResumen, ProductoDetalle, Variante } from '../../types/index';
+import { getAuthUser } from '../../utils/auth';
 
 type EstadoPago = 'CANCELADO' | 'PAGO_50' | 'PAGO_TOTAL';
 
@@ -14,6 +15,7 @@ interface CartItem {
 
 export const PedidoFormView = () => {
   const navigate = useNavigate();
+  const user = getAuthUser();
   const [saving, setSaving] = useState(false);
 
   const [clienteNombre, setClienteNombre] = useState('');
@@ -43,7 +45,7 @@ export const PedidoFormView = () => {
   useEffect(() => {
     const fetchProductos = async () => {
       try {
-        const res = await apiClient.get('/admin/productos');
+        const res = await apiClient.get('/productos');
         setProductos(res.data.filter((p: ProductoResumen) => p.estado === 'ACTIVO'));
       } catch {
         alert('Error al cargar el catalogo.');
@@ -60,7 +62,7 @@ export const PedidoFormView = () => {
         return;
       }
       try {
-        const res = await apiClient.get(`/admin/productos/${selectedProductoId}`);
+        const res = await apiClient.get(`/productos/${selectedProductoId}`);
         const prod: ProductoDetalle = res.data;
         setVariantesDisponibles(prod.variantes.filter(v => v.estado === 'ACTIVO'));
         setSelectedVarianteId('');
@@ -161,7 +163,12 @@ export const PedidoFormView = () => {
     try {
       const res = await apiClient.post('/admin/pedidos', pedidoPayload);
       alert(requiereEnvio ? 'Pedido y logistica creados con exito.' : 'Pedido creado sin guia de envio.');
-      navigate(`/admin/pedidos/${res.data.id_pedido}`);
+      if (user?.rol === 'VENDEDOR') {
+        navigate('/admin/pedidos/nuevo', { replace: true });
+        window.location.reload();
+      } else {
+        navigate(`/admin/pedidos/${res.data.id_pedido}`);
+      }
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Ocurrio un error al procesar el pedido.');
     } finally {
@@ -172,9 +179,11 @@ export const PedidoFormView = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-20">
       <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/admin/pedidos')} className="p-2 text-slate-400 hover:text-slate-600 bg-white rounded-lg border border-slate-200 shadow-sm cursor-pointer">
-          <ArrowLeft size={20} />
-        </button>
+        {user?.rol === 'ADMINISTRADOR' && (
+          <button onClick={() => navigate('/admin/pedidos')} className="p-2 text-slate-400 hover:text-slate-600 bg-white rounded-lg border border-slate-200 shadow-sm cursor-pointer">
+            <ArrowLeft size={20} />
+          </button>
+        )}
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Crear Pedido Manual</h2>
           <p className="text-slate-500 text-sm mt-1">Registra una venta desde atencion al cliente o tienda fisica</p>
@@ -243,7 +252,7 @@ export const PedidoFormView = () => {
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Producto</label>
                   <select value={selectedProductoId} onChange={(e) => setSelectedProductoId(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none bg-white text-sm">
                     <option value="">Seleccione...</option>
-                    {productos.map(p => <option key={p.id_producto} value={p.id_producto}>{p.nombre}</option>)}
+                    {productos.map(p => <option key={p.id_producto} value={p.id_producto}>{p.codigo_producto} - {p.nombre}</option>)}
                   </select>
                 </div>
 

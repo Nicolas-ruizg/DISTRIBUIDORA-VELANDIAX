@@ -16,6 +16,7 @@ export const ProductoFormView = () => {
   const [saving, setSaving] = useState(false);
   
   const [producto, setProducto] = useState({
+    codigo_producto: '',
     nombre: '', 
     descripcion: '', 
     id_categoria: 0, 
@@ -50,6 +51,7 @@ export const ProductoFormView = () => {
       const prodRes = await apiClient.get(`/admin/productos/${id}`);
       const p: ProductoDetalle = prodRes.data;
       setProducto({ 
+        codigo_producto: p.codigo_producto,
         nombre: p.nombre, 
         descripcion: p.descripcion || '', 
         id_categoria: p.id_categoria, 
@@ -85,11 +87,15 @@ export const ProductoFormView = () => {
     e.preventDefault();
     setSaving(true);
     try {
+      const payload = {
+        ...producto,
+        codigo_producto: producto.codigo_producto.trim().toUpperCase(),
+      };
       if (isEditing) {
-        await apiClient.put(`/admin/productos/${id}`, producto);
+        await apiClient.put(`/admin/productos/${id}`, payload);
         alert('Producto actualizado.');
       } else {
-        const res = await apiClient.post('/admin/productos', producto);
+        const res = await apiClient.post('/admin/productos', payload);
         navigate(`/admin/productos/${res.data.id_producto}`);
       }
     } catch (err: any) { alert(err.response?.data?.detail || 'Error al guardar.'); } 
@@ -217,7 +223,7 @@ export const ProductoFormView = () => {
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/admin/productos')} className="p-2 text-slate-400 hover:text-slate-600 bg-white rounded-lg border border-slate-200 shadow-sm"><ArrowLeft size={20} /></button>
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">{isEditing ? `Producto #${id}` : 'Nuevo Producto'}</h2>
+            <h2 className="text-2xl font-bold text-slate-800">{isEditing ? `Producto ${producto.codigo_producto}` : 'Nuevo Producto'}</h2>
             <p className="text-slate-500 text-sm mt-1">Información principal, galería y variantes</p>
           </div>
         </div>
@@ -233,7 +239,19 @@ export const ProductoFormView = () => {
       <form onSubmit={handleSaveProducto} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center gap-2"><Package className="text-blue-600" size={20} /><h3 className="text-lg font-bold text-slate-800">1. Detalles Básicos</h3></div>
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="md:col-span-2">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Codigo de Producto *</label>
+            <input
+              type="text"
+              required
+              value={producto.codigo_producto}
+              onChange={(e) => setProducto({...producto, codigo_producto: e.target.value.toUpperCase()})}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 font-bold uppercase"
+              placeholder="Ej: VX-CAM-001"
+            />
+            <p className="text-xs text-slate-400 mt-1">Este codigo lo define el negocio, no es autoincremental.</p>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Nombre *</label>
             <input type="text" required value={producto.nombre} onChange={(e) => setProducto({...producto, nombre: e.target.value})} className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600" />
           </div>

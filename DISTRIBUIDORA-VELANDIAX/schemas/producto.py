@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class ProductoCreate(BaseModel):
     id_categoria: int = Field(gt=0)
+    codigo_producto: str = Field(min_length=2, max_length=60)
     nombre: str = Field(min_length=2, max_length=160)
     descripcion: Optional[str] = None
     paquete_estatico: bool = False
@@ -16,6 +17,7 @@ class ProductoCreate(BaseModel):
 
 class ProductoUpdate(BaseModel):
     id_categoria: Optional[int] = Field(None, gt=0)
+    codigo_producto: Optional[str] = Field(None, min_length=2, max_length=60)
     nombre: Optional[str] = Field(None, min_length=2, max_length=160)
     descripcion: Optional[str] = None
     paquete_estatico: Optional[bool] = None
@@ -96,6 +98,7 @@ class VarianteUpdate(BaseModel):
 
 class ProductoResumenResponse(BaseModel):
     id_producto: int
+    codigo_producto: str
     id_categoria: int
     categoria: str
     nombre: str
@@ -124,6 +127,7 @@ class VarianteProductoResponse(BaseModel):
 
 class ProductoDetalleResponse(BaseModel):
     id_producto: int
+    codigo_producto: str
     id_categoria: int
     categoria: str
     nombre: str

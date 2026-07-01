@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from database.connection import get_db
 from database.models import Cliente, Envio, ItemPedido, Pedido, VarianteProducto
-from routes.admin import verificar_admin
+from routes.admin import verificar_admin, verificar_ventas
 from schemas.pedido import (
     PedidoCreate,
     PedidoDetalleResponse,
@@ -203,7 +203,7 @@ def listar_pedidos(
 @router.post("", response_model=PedidoDetalleResponse, status_code=status.HTTP_201_CREATED)
 def crear_pedido(
     pedido: PedidoCreate,
-    usuario: dict = Depends(verificar_admin),
+    usuario: dict = Depends(verificar_ventas),
     db: Session = Depends(get_db),
 ):
     estado_pago = _normalizar_estado_pago(pedido.estado_pago)
