@@ -167,6 +167,9 @@ export const ProductView = () => {
           </h1>
           <div className="flex items-center gap-4 mb-6 text-sm text-slate-500">
             <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded font-bold uppercase tracking-wider">{producto.categoria}</span>
+            <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded font-bold uppercase tracking-wider">
+              {producto.deposito || producto.id_deposito}
+            </span>
             <div className="flex items-center gap-1 text-amber-500"><Star size={16} fill="currentColor"/> 4.9 (128 reviews)</div>
           </div>
 

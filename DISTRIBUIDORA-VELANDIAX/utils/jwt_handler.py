@@ -28,6 +28,10 @@ def crear_token(usuario):
     payload = {
         "id_usuario": usuario["id_usuario"],
         "nombre": usuario["nombre"],
+        "email": usuario.get("email"),
+        "codigo_cuenta": usuario.get("codigo_cuenta"),
+        "id_deposito": usuario.get("id_deposito"),
+        "deposito": usuario.get("deposito"),
         "rol": usuario["rol"],
         "iat": ahora,
         "exp": ahora + timedelta(hours=horas_expiracion),

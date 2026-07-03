@@ -29,6 +29,8 @@ import { FavoritesProvider } from './context/FavoritesContext';
 import { CategoryView } from './features/storefront/CategoryView';
 import { SaleView } from './features/storefront/SaleView';
 import { OrderTrackingView } from './features/storefront/OrderTrackingView';
+import { DepositosView } from './features/admin/DepositosView';
+import { UsuariosView } from './features/admin/UsuariosView';
 
 function App() {
   return (
@@ -60,6 +62,8 @@ function App() {
             <Route path="pedidos" element={<RoleRoute allowedRoles={['ADMINISTRADOR']}><PedidosView /></RoleRoute>} />
             <Route path="pedidos/nuevo" element={<RoleRoute allowedRoles={['ADMINISTRADOR', 'VENDEDOR']}><PedidoFormView /></RoleRoute>} />
             <Route path="pedidos/:id" element={<RoleRoute allowedRoles={['ADMINISTRADOR']}><PedidoDetalleView /></RoleRoute>} />
+            <Route path="depositos" element={<RoleRoute allowedRoles={['ADMINISTRADOR']}><DepositosView /></RoleRoute>} />
+            <Route path="usuarios" element={<RoleRoute allowedRoles={['ADMINISTRADOR']}><UsuariosView /></RoleRoute>} />
             
             <Route index element={<Navigate to="dashboard" replace />} />
           </Route>

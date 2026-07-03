@@ -76,6 +76,7 @@ export const ProductosView = () => {
                   <th className="p-4 font-medium">Codigo</th>
                   <th className="p-4 font-medium">Producto</th>
                   <th className="p-4 font-medium">Categoría</th>
+                  <th className="p-4 font-medium">Depósito</th>
                   <th className="p-4 font-medium text-center">Variantes</th>
                   <th className="p-4 font-medium">Precio Base</th>
                   <th className="p-4 font-medium text-center">Visible</th>
@@ -84,7 +85,7 @@ export const ProductosView = () => {
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {productos.length === 0 ? (
-                  <tr><td colSpan={7} className="p-8 text-center text-slate-500">No hay productos registrados.</td></tr>
+                  <tr><td colSpan={8} className="p-8 text-center text-slate-500">No hay productos registrados.</td></tr>
                 ) : (
                   productos.map((producto) => (
                     <tr key={producto.id_producto} className={`transition-colors ${producto.estado === 'INACTIVO' ? 'bg-slate-50 opacity-70' : 'hover:bg-slate-50'}`}>
@@ -111,6 +112,7 @@ export const ProductosView = () => {
                       </td>
 
                       <td className="p-4 text-sm text-slate-600 font-medium">{producto.categoria}</td>
+                      <td className="p-4 text-sm text-slate-600 font-medium">{producto.deposito || producto.id_deposito}</td>
                       <td className="p-4 text-sm text-center">
                         <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold ${producto.variantes > 0 ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
                           {producto.variantes} Vars.

@@ -2,10 +2,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Phone, Package, Plus, Trash2, Save, ShoppingCart, Truck, MapPin } from 'lucide-react';
 import apiClient from '../../api/axios';
-import type { ProductoResumen, ProductoDetalle, Variante } from '../../types/index';
+import type { Deposito, ProductoResumen, ProductoDetalle, Variante } from '../../types/index';
 import { getAuthUser } from '../../utils/auth';
 
 type EstadoPago = 'CANCELADO' | 'PAGO_50' | 'PAGO_TOTAL';
+type CanalVenta = 'PRESENCIAL' | 'WEB';
+type TipoEnvio = 'CONTRAENTREGA' | 'GRATIS';
 
 interface CartItem {
   variante: Variante;
@@ -19,10 +21,14 @@ export const PedidoFormView = () => {
   const [saving, setSaving] = useState(false);
 
   const [clienteNombre, setClienteNombre] = useState('');
+  const [clienteCedula, setClienteCedula] = useState('');
   const [clienteCelular, setClienteCelular] = useState('');
+  const [canalVenta, setCanalVenta] = useState<CanalVenta>('PRESENCIAL');
+  const [tipoEnvio, setTipoEnvio] = useState<TipoEnvio>('CONTRAENTREGA');
+  const [depositos, setDepositos] = useState<Deposito[]>([]);
+  const [idDeposito, setIdDeposito] = useState('DEP001');
   const [esMayorista, setEsMayorista] = useState(false);
   const [estadoPago, setEstadoPago] = useState<EstadoPago>('PAGO_TOTAL');
-  const [precioEnvio, setPrecioEnvio] = useState(0);
   const [envioData, setEnvioData] = useState({
     transportadora: 'VELANDIAX EXPRESS',
     numero_guia: '',
@@ -36,6 +42,7 @@ export const PedidoFormView = () => {
   });
 
   const [productos, setProductos] = useState<ProductoResumen[]>([]);
+  const [codigoBusqueda, setCodigoBusqueda] = useState('');
   const [selectedProductoId, setSelectedProductoId] = useState<number | ''>('');
   const [variantesDisponibles, setVariantesDisponibles] = useState<Variante[]>([]);
   const [selectedVarianteId, setSelectedVarianteId] = useState<number | ''>('');
@@ -45,8 +52,13 @@ export const PedidoFormView = () => {
   useEffect(() => {
     const fetchProductos = async () => {
       try {
-        const res = await apiClient.get('/productos');
-        setProductos(res.data.filter((p: ProductoResumen) => p.estado === 'ACTIVO'));
+        const [productosRes, depositosRes] = await Promise.all([
+          apiClient.get('/admin/productos', { params: { incluir_inactivos: false, incluir_variantes_inactivas: false } }),
+          apiClient.get('/admin/depositos'),
+        ]);
+        setProductos(productosRes.data.filter((p: ProductoResumen) => p.estado === 'ACTIVO'));
+        setDepositos(depositosRes.data);
+        if (depositosRes.data.length > 0) setIdDeposito(depositosRes.data[0].id_deposito);
       } catch {
         alert('Error al cargar el catalogo.');
       }
@@ -62,7 +74,7 @@ export const PedidoFormView = () => {
         return;
       }
       try {
-        const res = await apiClient.get(`/productos/${selectedProductoId}`);
+        const res = await apiClient.get(`/admin/productos/${selectedProductoId}`);
         const prod: ProductoDetalle = res.data;
         setVariantesDisponibles(prod.variantes.filter(v => v.estado === 'ACTIVO'));
         setSelectedVarianteId('');
@@ -73,7 +85,23 @@ export const PedidoFormView = () => {
     fetchVariantes();
   }, [selectedProductoId]);
 
-  const requiereEnvio = estadoPago === 'PAGO_50' || estadoPago === 'PAGO_TOTAL';
+  useEffect(() => {
+    if (canalVenta === 'PRESENCIAL') {
+      if (estadoPago === 'PAGO_50') setEstadoPago('PAGO_TOTAL');
+      setTipoEnvio('CONTRAENTREGA');
+      setEnvioData(prev => ({
+        ...prev,
+        numero_guia: '',
+        direccion: '',
+        ciudad: '',
+        departamento: '',
+        codigo_postal: '',
+        notas: '',
+      }));
+    }
+  }, [canalVenta, estadoPago]);
+
+  const requiereEnvio = canalVenta === 'WEB' && (estadoPago === 'PAGO_50' || estadoPago === 'PAGO_TOTAL');
 
   const subtotal = useMemo(() => {
     return cart.reduce((acc, item) => {
@@ -82,7 +110,7 @@ export const PedidoFormView = () => {
     }, 0);
   }, [cart, esMayorista]);
 
-  const totalPedido = subtotal + (requiereEnvio ? precioEnvio : 0);
+  const totalPedido = subtotal;
 
   const formatearDinero = (monto: number) =>
     new Intl.NumberFormat('es-CO', {
@@ -121,6 +149,17 @@ export const PedidoFormView = () => {
     setCantidadItem(1);
   };
 
+  const seleccionarProductoPorCodigo = () => {
+    const codigo = codigoBusqueda.trim().toUpperCase();
+    if (!codigo) return;
+    const producto = productos.find(p => p.codigo_producto.toUpperCase() === codigo);
+    if (!producto) {
+      alert('No encontré un producto activo con ese código.');
+      return;
+    }
+    setSelectedProductoId(producto.id_producto);
+  };
+
   const removeFromCart = (id_variante: number) => {
     setCart(cart.filter(item => item.variante.id_variante !== id_variante));
   };
@@ -128,6 +167,7 @@ export const PedidoFormView = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) return alert('El pedido debe tener al menos un producto.');
+    if (!clienteCedula.trim()) return alert('La cedula del cliente es obligatoria.');
     if (requiereEnvio && (!envioData.nombre_destinatario || !envioData.direccion || !envioData.ciudad)) {
       return alert('Por favor completa nombre, direccion y ciudad de envio.');
     }
@@ -144,14 +184,17 @@ export const PedidoFormView = () => {
       departamento: envioData.departamento,
       codigo_postal: envioData.codigo_postal.trim() === '' ? null : envioData.codigo_postal.trim(),
       notas: envioData.notas.trim() === '' ? null : envioData.notas.trim(),
-      costo: precioEnvio,
+      costo: 0,
     } : null;
 
     const pedidoPayload = {
-      cliente: { nombre: clienteNombre, celular: clienteCelular },
+      cliente: { nombre: clienteNombre, cedula: clienteCedula.trim(), celular: clienteCelular },
+      id_deposito: idDeposito,
+      canal_venta: canalVenta,
+      tipo_envio: requiereEnvio ? tipoEnvio : null,
       estado: 'PENDIENTE',
       estado_pago: estadoPago,
-      precio_envio: requiereEnvio ? precioEnvio : 0,
+      precio_envio: 0,
       es_mayorista: esMayorista,
       envio: envioPayload,
       items: cart.map(item => ({
@@ -198,6 +241,17 @@ export const PedidoFormView = () => {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Cedula / NIT *</label>
+                <input
+                  type="text"
+                  required
+                  value={clienteCedula}
+                  onChange={(e) => setClienteCedula(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-black"
+                  placeholder="Ej: 1001234567"
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Numero de Celular *</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -225,6 +279,38 @@ export const PedidoFormView = () => {
               </div>
             </div>
 
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                <label className="block text-sm font-bold text-slate-700 mb-2">Deposito</label>
+                <select
+                  required
+                  value={idDeposito}
+                  onChange={(e) => setIdDeposito(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none bg-white text-sm"
+                >
+                  {depositos.map((deposito) => (
+                    <option key={deposito.id_deposito} value={deposito.id_deposito}>
+                      {deposito.id_deposito} - {deposito.nombre || 'Sin nombre'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                <div className="flex-1">
+                  <p className="font-bold text-slate-800 text-sm">Canal de venta</p>
+                  <p className="text-xs text-slate-500">Actual: {canalVenta === 'PRESENCIAL' ? 'Presencial' : 'Web'}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCanalVenta(canalVenta === 'PRESENCIAL' ? 'WEB' : 'PRESENCIAL')}
+                  className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors cursor-pointer ${canalVenta === 'PRESENCIAL' ? 'bg-black' : 'bg-slate-400'}`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${canalVenta === 'PRESENCIAL' ? 'translate-x-8' : 'translate-x-1'}`} />
+                </button>
+              </div>
+            </div>
+
             <div className="mt-6 flex items-center gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
               <div className="flex-1">
                 <p className="font-bold text-slate-800 text-sm">Aplicar precios mayoristas</p>
@@ -248,15 +334,50 @@ export const PedidoFormView = () => {
 
             <div className="p-6 bg-slate-50 border-b border-slate-100">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                <div className="md:col-span-4">
+                <div className="md:col-span-3">
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Código</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={codigoBusqueda}
+                      onChange={(e) => setCodigoBusqueda(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          seleccionarProductoPorCodigo();
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none bg-white text-sm font-bold uppercase"
+                      placeholder="VX-001"
+                    />
+                    <button
+                      type="button"
+                      onClick={seleccionarProductoPorCodigo}
+                      className="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold"
+                    >
+                      Buscar
+                    </button>
+                  </div>
+                </div>
+
+                <div className="md:col-span-3">
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Producto</label>
-                  <select value={selectedProductoId} onChange={(e) => setSelectedProductoId(e.target.value ? Number(e.target.value) : '')} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none bg-white text-sm">
+                  <select
+                    value={selectedProductoId}
+                    onChange={(e) => {
+                      const value = e.target.value ? Number(e.target.value) : '';
+                      setSelectedProductoId(value);
+                      const producto = productos.find(p => p.id_producto === value);
+                      if (producto) setCodigoBusqueda(producto.codigo_producto);
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none bg-white text-sm"
+                  >
                     <option value="">Seleccione...</option>
                     {productos.map(p => <option key={p.id_producto} value={p.id_producto}>{p.codigo_producto} - {p.nombre}</option>)}
                   </select>
                 </div>
 
-                <div className="md:col-span-5">
+                <div className="md:col-span-4">
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Variante (SKU)</label>
                   <select value={selectedVarianteId} onChange={(e) => setSelectedVarianteId(e.target.value ? Number(e.target.value) : '')} disabled={!selectedProductoId} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none bg-white text-sm disabled:bg-slate-100">
                     <option value="">{selectedProductoId ? 'Seleccione...' : 'Primero elija un producto'}</option>
@@ -329,16 +450,28 @@ export const PedidoFormView = () => {
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Estado de Pago</label>
                 <select value={estadoPago} onChange={(e) => setEstadoPago(e.target.value as EstadoPago)} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-black font-medium">
                   <option value="PAGO_TOTAL">Pago total</option>
-                  <option value="PAGO_50">Pago 50%</option>
+                  {canalVenta === 'WEB' && <option value="PAGO_50">Pago 50%</option>}
                   <option value="CANCELADO">Cancelado / sin pago</option>
                 </select>
-                <p className="text-xs text-slate-400 mt-1">Con pago 50% o total se genera guia de envio automaticamente.</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  {canalVenta === 'PRESENCIAL'
+                    ? 'En venta presencial no se genera guia ni pago 50%.'
+                    : 'Con pago 50% o total se genera guia de envio automaticamente.'}
+                </p>
               </div>
 
               {requiereEnvio && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Costo de Envio ($)</label>
-                  <input type="number" min="0" value={precioEnvio} onChange={e => setPrecioEnvio(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-black" />
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de envío</label>
+                  <select
+                    value={tipoEnvio}
+                    onChange={(e) => setTipoEnvio(e.target.value as TipoEnvio)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-black font-medium"
+                  >
+                    <option value="CONTRAENTREGA">Pago contraentrega</option>
+                    <option value="GRATIS">Envío gratis</option>
+                  </select>
+                  <p className="text-xs text-slate-400 mt-1">No se escribe valor manual de envío.</p>
                 </div>
               )}
             </div>
@@ -369,7 +502,12 @@ export const PedidoFormView = () => {
                 <span>Subtotal Items:</span> <span>{formatearDinero(subtotal)}</span>
               </div>
               <div className="flex justify-between text-sm text-slate-600">
-                <span>Envio:</span> <span>{formatearDinero(requiereEnvio ? precioEnvio : 0)}</span>
+                <span>Envio:</span>
+                <span>
+                  {requiereEnvio
+                    ? tipoEnvio === 'GRATIS' ? 'Gratis' : 'Contraentrega'
+                    : 'No aplica'}
+                </span>
               </div>
               <div className="flex justify-between text-xl font-bold text-slate-900 pt-3 border-t border-slate-200 mt-2">
                 <span>TOTAL:</span> <span className="text-black">{formatearDinero(totalPedido)}</span>

@@ -3,7 +3,7 @@ from datetime import datetime
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from database.connection import get_db
 from database.models import Usuario
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/admin", tags=["auth"])
 @router.post("/login", response_model=AdminLoginResponse)
 def admin_login(data: AdminLoginRequest, db: Session = Depends(get_db)):
     usuario_db = db.scalar(
-        select(Usuario).where(
+        select(Usuario).options(joinedload(Usuario.deposito)).where(
             func.lower(Usuario.email) == data.email.strip().lower(),
             Usuario.activo.is_(True),
         )
@@ -46,6 +46,9 @@ def admin_login(data: AdminLoginRequest, db: Session = Depends(get_db)):
         "id_usuario": usuario_db.id_usuario,
         "nombre": usuario_db.nombre,
         "email": usuario_db.email,
+        "codigo_cuenta": usuario_db.codigo_cuenta,
+        "id_deposito": usuario_db.id_deposito,
+        "deposito": usuario_db.deposito.nombre if usuario_db.deposito else None,
         "rol": rol,
     }
     return {

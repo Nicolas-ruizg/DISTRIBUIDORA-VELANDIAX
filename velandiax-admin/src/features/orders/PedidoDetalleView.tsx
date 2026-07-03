@@ -167,8 +167,20 @@ export const PedidoDetalleView = () => {
             <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><User size={18} className="text-slate-400"/> Cliente</h3>
             <div className="text-sm space-y-2">
               <p><span className="text-slate-500">Nombre:</span> <span className="font-bold text-slate-800">{pedido.cliente}</span></p>
+              <p><span className="text-slate-500">Cedula/NIT:</span> <span className="font-medium text-slate-800">{pedido.cedula_cliente || 'N/A'}</span></p>
               <p><span className="text-slate-500">Celular:</span> <span className="font-medium text-slate-800">{pedido.celular}</span></p>
               <p><span className="text-slate-500">Tipo:</span> {pedido.es_mayorista ? <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded text-xs font-bold">Mayorista</span> : <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-bold">Minorista</span>}</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <h3 className="font-bold text-slate-800 mb-4">Trazabilidad</h3>
+            <div className="text-sm space-y-2">
+              <p><span className="text-slate-500">Deposito:</span> <span className="font-bold text-slate-800">{pedido.id_deposito}</span> {pedido.deposito && <span className="text-slate-500">({pedido.deposito})</span>}</p>
+              <p><span className="text-slate-500">Canal:</span> <span className="font-bold text-slate-800">{pedido.canal_venta}</span></p>
+              <p><span className="text-slate-500">Tipo envio:</span> <span className="font-bold text-slate-800">{pedido.tipo_envio || 'No aplica'}</span></p>
+              <p><span className="text-slate-500">Vendedor:</span> <span className="font-bold text-slate-800">{pedido.codigo_cuenta_vendedor || 'N/A'}</span> {pedido.vendedor && <span className="text-slate-500">- {pedido.vendedor}</span>}</p>
+              <p><span className="text-slate-500">Inventario:</span> <span className="font-bold text-slate-800">{pedido.codigo_cuenta_inventario || 'N/A'}</span> {pedido.inventario && <span className="text-slate-500">- {pedido.inventario}</span>}</p>
             </div>
           </div>
 

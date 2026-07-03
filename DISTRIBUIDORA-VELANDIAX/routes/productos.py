@@ -10,12 +10,13 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from database.connection import get_db
 from database.models import (
+    Deposito,
     ImagenProducto,
     ImagenVarianteProducto,
     Producto,
     VarianteProducto,
 )
-from routes.admin import verificar_inventario
+from routes.admin import ROL_ADMIN, normalizar_rol, verificar_inventario, verificar_usuario_autenticado
 from schemas.producto import (
     ImagenProductoCreate,
     ImagenProductoResponse,
@@ -202,6 +203,8 @@ def _serializar_producto_resumen(
         "codigo_producto": producto.codigo_producto,
         "id_categoria": producto.id_categoria,
         "categoria": producto.categoria.nombre,
+        "id_deposito": producto.id_deposito,
+        "deposito": producto.deposito.nombre if producto.deposito else None,
         "nombre": producto.nombre,
         "descripcion": producto.descripcion,
         "paquete_estatico": producto.paquete_estatico,
@@ -248,6 +251,8 @@ def _serializar_producto_detalle(
         "codigo_producto": producto.codigo_producto,
         "id_categoria": producto.id_categoria,
         "categoria": producto.categoria.nombre,
+        "id_deposito": producto.id_deposito,
+        "deposito": producto.deposito.nombre if producto.deposito else None,
         "nombre": producto.nombre,
         "descripcion": producto.descripcion,
         "paquete_estatico": producto.paquete_estatico,
@@ -281,15 +286,65 @@ def _normalizar_codigo_producto(codigo: str) -> str:
     return codigo_normalizado
 
 
+def _validar_deposito(db: Session, id_deposito: str) -> str:
+    id_normalizado = id_deposito.strip().upper()
+    deposito = db.get(Deposito, id_normalizado)
+    if not deposito or not deposito.activo:
+        raise HTTPException(status_code=404, detail="Deposito no encontrado o inactivo")
+    return id_normalizado
+
+
+def _deposito_usuario(usuario: dict) -> str | None:
+    if normalizar_rol(usuario.get("rol")) == ROL_ADMIN:
+        return None
+    id_deposito = usuario.get("id_deposito")
+    if not id_deposito:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El usuario no tiene deposito asignado",
+        )
+    return str(id_deposito).strip().upper()
+
+
+def _validar_acceso_producto_por_deposito(producto: Producto, usuario: dict) -> None:
+    id_deposito_usuario = _deposito_usuario(usuario)
+    if id_deposito_usuario and producto.id_deposito != id_deposito_usuario:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene acceso a productos de otro deposito",
+        )
+
+
+def _validar_acceso_variante_por_deposito(variante: VarianteProducto, usuario: dict) -> None:
+    producto = variante.producto or None
+    if producto is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    _validar_acceso_producto_por_deposito(producto, usuario)
+
+
+def _consultar_variante_admin(db: Session, id_variante: int, usuario: dict) -> VarianteProducto:
+    variante = db.scalar(
+        select(VarianteProducto)
+        .options(joinedload(VarianteProducto.producto))
+        .where(VarianteProducto.id_variante == id_variante)
+    )
+    if not variante:
+        raise HTTPException(status_code=404, detail="Variante no encontrada")
+    _validar_acceso_variante_por_deposito(variante, usuario)
+    return variante
+
+
 def _consultar_producto(
     db: Session,
     id_producto: int,
     incluir_inactivo: bool = False,
+    usuario: dict | None = None,
 ) -> Producto:
     consulta = (
         select(Producto)
         .options(
             joinedload(Producto.categoria),
+            joinedload(Producto.deposito),
             selectinload(Producto.variantes).selectinload(VarianteProducto.imagenes),
             selectinload(Producto.imagenes),
         )
@@ -304,6 +359,8 @@ def _consultar_producto(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Producto no encontrado",
         )
+    if usuario is not None:
+        _validar_acceso_producto_por_deposito(producto, usuario)
     return producto
 
 
@@ -313,11 +370,13 @@ def _listar_productos(
     incluir_paquetes: bool = True,
     incluir_inactivos: bool = False,
     incluir_variantes_inactivas: bool = False,
+    id_deposito: str | None = None,
 ):
     consulta = (
         select(Producto)
         .options(
             joinedload(Producto.categoria),
+            joinedload(Producto.deposito),
             selectinload(Producto.variantes).selectinload(VarianteProducto.imagenes),
             selectinload(Producto.imagenes),
         )
@@ -329,6 +388,8 @@ def _listar_productos(
         consulta = consulta.where(Producto.paquete_estatico.is_(False))
     if not incluir_inactivos:
         consulta = consulta.where(Producto.estado == "ACTIVO")
+    if id_deposito:
+        consulta = consulta.where(Producto.id_deposito == id_deposito)
 
     productos = db.scalars(consulta).all()
     return [
@@ -356,15 +417,17 @@ def listar_productos_admin(
     incluir_paquetes: bool = True,
     incluir_inactivos: bool = True,
     incluir_variantes_inactivas: bool = True,
-    usuario: dict = Depends(verificar_inventario),
+    usuario: dict = Depends(verificar_usuario_autenticado),
     db: Session = Depends(get_db),
 ):
+    id_deposito_usuario = _deposito_usuario(usuario)
     return _listar_productos(
         db=db,
         id_categoria=id_categoria,
         incluir_paquetes=incluir_paquetes,
         incluir_inactivos=incluir_inactivos,
         incluir_variantes_inactivas=incluir_variantes_inactivas,
+        id_deposito=id_deposito_usuario,
     )
 
 
@@ -376,11 +439,11 @@ def obtener_producto(id_producto: int, db: Session = Depends(get_db)):
 @router.get("/admin/productos/{id_producto}", response_model=ProductoDetalleResponse)
 def obtener_producto_admin(
     id_producto: int,
-    usuario: dict = Depends(verificar_inventario),
+    usuario: dict = Depends(verificar_usuario_autenticado),
     db: Session = Depends(get_db),
 ):
     return _serializar_producto_detalle(
-        _consultar_producto(db, id_producto, incluir_inactivo=True),
+        _consultar_producto(db, id_producto, incluir_inactivo=True, usuario=usuario),
         incluir_variantes_inactivas=True,
         incluir_imagenes_inactivas=True,
     )
@@ -398,6 +461,8 @@ def crear_producto(
 ):
     datos = producto.model_dump()
     datos["codigo_producto"] = _normalizar_codigo_producto(datos["codigo_producto"])
+    id_deposito_usuario = _deposito_usuario(usuario)
+    datos["id_deposito"] = id_deposito_usuario or _validar_deposito(db, datos["id_deposito"])
     producto_db = Producto(**datos)
     db.add(producto_db)
     try:
@@ -430,13 +495,17 @@ def actualizar_producto(
             detail="Debe enviar al menos un campo para actualizar",
         )
 
-    producto_db = db.get(Producto, id_producto)
-    if not producto_db:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    producto_db = _consultar_producto(db, id_producto, incluir_inactivo=True, usuario=usuario)
     if "codigo_producto" in cambios:
         cambios["codigo_producto"] = _normalizar_codigo_producto(
             cambios["codigo_producto"],
         )
+    if "id_deposito" in cambios:
+        id_deposito_usuario = _deposito_usuario(usuario)
+        if id_deposito_usuario:
+            cambios.pop("id_deposito", None)
+        else:
+            cambios["id_deposito"] = _validar_deposito(db, cambios["id_deposito"])
     for campo, valor in cambios.items():
         setattr(producto_db, campo, valor)
 
@@ -477,9 +546,7 @@ def crear_imagen_producto(
     usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
-    producto_db = db.get(Producto, id_producto)
-    if not producto_db:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    _consultar_producto(db, id_producto, incluir_inactivo=True, usuario=usuario)
 
     if imagen.es_principal:
         _desmarcar_imagenes_principales(db, id_producto)
@@ -518,9 +585,7 @@ def subir_imagen_producto(
     if estado not in {"ACTIVO", "INACTIVO"}:
         raise HTTPException(status_code=400, detail="Estado de imagen invalido")
 
-    producto_db = db.get(Producto, id_producto)
-    if not producto_db:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    _consultar_producto(db, id_producto, incluir_inactivo=True, usuario=usuario)
 
     contenido = archivo.file.read()
     url_publica = _subir_imagen_storage(
@@ -574,6 +639,10 @@ def actualizar_imagen_producto(
     imagen_db = db.get(ImagenProducto, id_imagen)
     if not imagen_db:
         raise HTTPException(status_code=404, detail="Imagen no encontrada")
+    producto_db = db.get(Producto, imagen_db.id_producto)
+    if not producto_db:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    _validar_acceso_producto_por_deposito(producto_db, usuario)
 
     if cambios.get("es_principal") is True:
         _desmarcar_imagenes_principales(db, imagen_db.id_producto)
@@ -615,9 +684,7 @@ def crear_imagen_variante(
     usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
-    variante_db = db.get(VarianteProducto, id_variante)
-    if not variante_db:
-        raise HTTPException(status_code=404, detail="Variante no encontrada")
+    variante_db = _consultar_variante_admin(db, id_variante, usuario)
 
     if imagen.es_principal:
         _desmarcar_imagenes_principales_variante(db, id_variante)
@@ -656,9 +723,7 @@ def subir_imagen_variante(
     if estado not in {"ACTIVO", "INACTIVO"}:
         raise HTTPException(status_code=400, detail="Estado de imagen invalido")
 
-    variante_db = db.get(VarianteProducto, id_variante)
-    if not variante_db:
-        raise HTTPException(status_code=404, detail="Variante no encontrada")
+    variante_db = _consultar_variante_admin(db, id_variante, usuario)
 
     contenido = archivo.file.read()
     url_publica = _subir_imagen_storage(
@@ -712,6 +777,7 @@ def actualizar_imagen_variante(
     imagen_db = db.get(ImagenVarianteProducto, id_imagen_variante)
     if not imagen_db:
         raise HTTPException(status_code=404, detail="Imagen no encontrada")
+    variante_db = _consultar_variante_admin(db, imagen_db.id_variante, usuario)
 
     if cambios.get("es_principal") is True:
         _desmarcar_imagenes_principales_variante(db, imagen_db.id_variante)
@@ -742,8 +808,7 @@ def crear_variante(
     usuario: dict = Depends(verificar_inventario),
     db: Session = Depends(get_db),
 ):
-    if not db.get(Producto, id_producto):
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    _consultar_producto(db, id_producto, incluir_inactivo=True, usuario=usuario)
 
     variante_db = VarianteProducto(id_producto=id_producto, **variante.model_dump())
     db.add(variante_db)
@@ -773,9 +838,7 @@ def actualizar_variante(
             detail="Debe enviar al menos un campo para actualizar",
         )
 
-    variante_db = db.get(VarianteProducto, id_variante)
-    if not variante_db:
-        raise HTTPException(status_code=404, detail="Variante no encontrada")
+    variante_db = _consultar_variante_admin(db, id_variante, usuario)
     for campo, valor in cambios.items():
         setattr(variante_db, campo, valor)
 

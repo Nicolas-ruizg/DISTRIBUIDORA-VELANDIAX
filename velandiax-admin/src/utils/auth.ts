@@ -4,6 +4,9 @@ export interface AuthUser {
   id_usuario: number;
   nombre: string;
   email: string;
+  codigo_cuenta?: string | null;
+  id_deposito?: string | null;
+  deposito?: string | null;
   rol: UserRole;
 }
 

@@ -232,6 +232,9 @@ export const HomeView = () => {
                       <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">
                         {prod.categoria}
                       </span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">
+                        Disponible en {prod.deposito || prod.id_deposito}
+                      </span>
                       <h3 className="text-sm font-medium text-slate-800 line-clamp-2 leading-tight mb-2 group-hover:underline">
                         {prod.nombre}
                       </h3>

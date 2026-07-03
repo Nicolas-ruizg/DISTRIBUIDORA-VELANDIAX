@@ -62,6 +62,7 @@ export const PedidosView = () => {
                   <th className="p-4 font-medium">Pedido</th>
                   <th className="p-4 font-medium">Fecha</th>
                   <th className="p-4 font-medium">Cliente</th>
+                  <th className="p-4 font-medium">Trazabilidad</th>
                   <th className="p-4 font-medium">Estado</th>
                   <th className="p-4 font-medium text-right">Total</th>
                   <th className="p-4 font-medium text-center">Acciones</th>
@@ -76,7 +77,14 @@ export const PedidosView = () => {
                     <td className="p-4 text-sm text-slate-600">{formatearFecha(pedido.fecha)}</td>
                     <td className="p-4 text-sm">
                       <div className="font-bold text-slate-800">{pedido.cliente}</div>
+                      <div className="text-xs text-slate-500">CC/NIT: {pedido.cedula_cliente || 'N/A'}</div>
                       <div className="text-xs text-slate-500">{pedido.celular} {pedido.es_mayorista && <span className="text-black font-bold ml-1">(Mayorista)</span>}</div>
+                    </td>
+                    <td className="p-4 text-xs text-slate-600">
+                      <div><span className="font-bold">Deposito:</span> {pedido.id_deposito}</div>
+                      <div><span className="font-bold">Canal:</span> {pedido.canal_venta}</div>
+                      {pedido.tipo_envio && <div><span className="font-bold">Envio:</span> {pedido.tipo_envio}</div>}
+                      <div><span className="font-bold">Vendedor:</span> {pedido.codigo_cuenta_vendedor || 'N/A'}</div>
                     </td>
                     <td className="p-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getEstadoBadge(pedido.estado)}`}>

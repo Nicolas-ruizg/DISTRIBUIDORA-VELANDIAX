@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import {
   Bell,
+  Building2,
   LayoutDashboard,
   LogOut,
   Package,
@@ -23,6 +24,8 @@ const menuItems: Array<{
   { name: 'Productos', path: '/admin/productos', icon: <Package size={20} />, roles: ['ADMINISTRADOR', 'INVENTARIO'] },
   { name: 'Registrar Venta', path: '/admin/pedidos/nuevo', icon: <ShoppingCart size={20} />, roles: ['ADMINISTRADOR', 'VENDEDOR'] },
   { name: 'Historial de Ventas', path: '/admin/pedidos', icon: <Users size={20} />, roles: ['ADMINISTRADOR'] },
+  { name: 'Depositos', path: '/admin/depositos', icon: <Building2 size={20} />, roles: ['ADMINISTRADOR'] },
+  { name: 'Usuarios', path: '/admin/usuarios', icon: <Users size={20} />, roles: ['ADMINISTRADOR'] },
 ];
 
 export const AdminLayout = () => {
@@ -69,6 +72,9 @@ export const AdminLayout = () => {
             <div className="flex flex-col">
               <span className="text-sm font-medium text-white">{user?.nombre || 'Usuario'}</span>
               <span className="text-xs text-slate-500">{user?.email || user?.rol}</span>
+              {user?.id_deposito && (
+                <span className="text-xs text-slate-500">{user.id_deposito} - {user.deposito || 'Deposito'}</span>
+              )}
             </div>
           </div>
           <button

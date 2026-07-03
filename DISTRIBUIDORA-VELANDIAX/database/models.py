@@ -33,8 +33,10 @@ class Usuario(Base):
     )
 
     id_usuario: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id_deposito: Mapped[str | None] = mapped_column(ForeignKey("depositos.id_deposito"))
     nombre: Mapped[str] = mapped_column(String(150), nullable=False)
     email: Mapped[str] = mapped_column(String(160), unique=True, nullable=False)
+    codigo_cuenta: Mapped[str | None] = mapped_column(String(20), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     rol: Mapped[str] = mapped_column(String(30), nullable=False, default="ADMINISTRADOR")
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -44,6 +46,8 @@ class Usuario(Base):
         server_default=func.current_timestamp(),
     )
     ultimo_acceso: Mapped[datetime | None] = mapped_column(DateTime)
+
+    deposito: Mapped["Deposito | None"] = relationship(back_populates="usuarios")
 
 
 class Categoria(Base):
@@ -67,6 +71,11 @@ class Producto(Base):
         ForeignKey("categoria.id_categoria"),
         nullable=False,
     )
+    id_deposito: Mapped[str] = mapped_column(
+        ForeignKey("depositos.id_deposito"),
+        nullable=False,
+        default="DEP001",
+    )
     codigo_producto: Mapped[str] = mapped_column(String(60), unique=True, nullable=False)
     nombre: Mapped[str] = mapped_column(String(200), nullable=False)
     descripcion: Mapped[str | None] = mapped_column(Text)
@@ -76,6 +85,7 @@ class Producto(Base):
     estado: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVO")
 
     categoria: Mapped[Categoria] = relationship(back_populates="productos")
+    deposito: Mapped["Deposito"] = relationship(back_populates="productos")
     variantes: Mapped[list["VarianteProducto"]] = relationship(
         back_populates="producto",
         cascade="all, delete-orphan",
@@ -178,10 +188,28 @@ class Cliente(Base):
     __tablename__ = "clientes"
 
     id_cliente: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cedula: Mapped[str | None] = mapped_column(String(30), unique=True)
     celular: Mapped[str | None] = mapped_column(String(20), unique=True)
     nombre: Mapped[str] = mapped_column(String(200), nullable=False)
 
     pedidos: Mapped[list["Pedido"]] = relationship(back_populates="cliente")
+
+
+class Deposito(Base):
+    __tablename__ = "depositos"
+
+    id_deposito: Mapped[str] = mapped_column(String(20), primary_key=True)
+    nombre: Mapped[str | None] = mapped_column(String(120))
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    fecha_creacion: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.current_timestamp(),
+    )
+
+    pedidos: Mapped[list["Pedido"]] = relationship(back_populates="deposito")
+    productos: Mapped[list["Producto"]] = relationship(back_populates="deposito")
+    usuarios: Mapped[list["Usuario"]] = relationship(back_populates="deposito")
 
 
 class Pedido(Base):
@@ -191,6 +219,14 @@ class Pedido(Base):
             "estado_pago IN ('PAGO_50', 'PAGO_TOTAL', 'CANCELADO')",
             name="ck_pedido_estado_pago_orm",
         ),
+        CheckConstraint(
+            "canal_venta IN ('PRESENCIAL', 'WEB')",
+            name="ck_pedido_canal_venta_orm",
+        ),
+        CheckConstraint(
+            "tipo_envio IS NULL OR tipo_envio IN ('CONTRAENTREGA', 'GRATIS')",
+            name="ck_pedido_tipo_envio_orm",
+        ),
     )
 
     id_pedido: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -198,6 +234,15 @@ class Pedido(Base):
         ForeignKey("clientes.id_cliente"),
         nullable=False,
     )
+    id_deposito: Mapped[str] = mapped_column(
+        ForeignKey("depositos.id_deposito"),
+        nullable=False,
+        default="DEP001",
+    )
+    id_usuario_venta: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id_usuario"))
+    id_usuario_inventario: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id_usuario"))
+    canal_venta: Mapped[str] = mapped_column(String(20), nullable=False, default="WEB")
+    tipo_envio: Mapped[str | None] = mapped_column(String(30))
     estado: Mapped[str] = mapped_column(String(30), nullable=False)
     estado_pago: Mapped[str] = mapped_column(String(20), nullable=False, default="CANCELADO")
     total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
@@ -206,6 +251,9 @@ class Pedido(Base):
     fecha: Mapped[datetime] = mapped_column(DateTime, server_default=func.current_timestamp())
 
     cliente: Mapped[Cliente] = relationship(back_populates="pedidos")
+    deposito: Mapped[Deposito] = relationship(back_populates="pedidos")
+    usuario_venta: Mapped[Usuario | None] = relationship(foreign_keys=[id_usuario_venta])
+    usuario_inventario: Mapped[Usuario | None] = relationship(foreign_keys=[id_usuario_inventario])
     items: Mapped[list["ItemPedido"]] = relationship(
         back_populates="pedido",
         cascade="all, delete-orphan",

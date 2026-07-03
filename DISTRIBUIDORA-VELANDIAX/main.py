@@ -11,6 +11,7 @@ from routes.productos import router as productos_router
 from routes.pedidos import router as pedidos_router
 from routes.usuarios import router as usuarios_router
 from routes.envios import router as envios_router
+from routes.depositos import router as depositos_router
 from routes.seguimiento import router as seguimiento_router
 from services.simulador_envios import ejecutar_simulador
 
@@ -57,6 +58,7 @@ app.include_router(productos_router)
 app.include_router(pedidos_router)
 app.include_router(usuarios_router)
 app.include_router(envios_router)
+app.include_router(depositos_router)
 app.include_router(seguimiento_router)
 
 

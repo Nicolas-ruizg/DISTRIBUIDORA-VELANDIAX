@@ -2,10 +2,10 @@ import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from database.connection import get_db
-from database.models import Usuario
+from database.models import Deposito, Usuario
 from routes.admin import ROLES_VALIDOS
 from routes.admin import verificar_admin
 from schemas.usuario import UsuarioCreate, UsuarioResponse, UsuarioUpdate
@@ -18,6 +18,9 @@ def _serializar_usuario(usuario: Usuario):
         "id_usuario": usuario.id_usuario,
         "nombre": usuario.nombre,
         "email": usuario.email,
+        "id_deposito": usuario.id_deposito,
+        "deposito": usuario.deposito.nombre if usuario.deposito else None,
+        "codigo_cuenta": usuario.codigo_cuenta,
         "rol": usuario.rol,
         "activo": usuario.activo,
         "fecha_creacion": usuario.fecha_creacion,
@@ -32,12 +35,33 @@ def _normalizar_rol(rol: str) -> str:
     return rol_normalizado
 
 
+def _normalizar_codigo_cuenta(codigo: str | None) -> str | None:
+    if codigo is None:
+        return None
+    codigo_normalizado = codigo.strip().upper()
+    return codigo_normalizado or None
+
+
+def _validar_deposito(db: Session, id_deposito: str | None) -> str | None:
+    if id_deposito is None:
+        return None
+    id_normalizado = id_deposito.strip().upper()
+    if not id_normalizado:
+        return None
+    deposito = db.get(Deposito, id_normalizado)
+    if not deposito or not deposito.activo:
+        raise HTTPException(status_code=404, detail="Deposito no encontrado o inactivo")
+    return id_normalizado
+
+
 @router.get("", response_model=list[UsuarioResponse])
 def listar_usuarios(
     usuario: dict = Depends(verificar_admin),
     db: Session = Depends(get_db),
 ):
-    usuarios = db.scalars(select(Usuario).order_by(Usuario.nombre)).all()
+    usuarios = db.scalars(
+        select(Usuario).options(joinedload(Usuario.deposito)).order_by(Usuario.nombre)
+    ).all()
     return [_serializar_usuario(usuario_db) for usuario_db in usuarios]
 
 
@@ -47,7 +71,11 @@ def obtener_usuario(
     usuario: dict = Depends(verificar_admin),
     db: Session = Depends(get_db),
 ):
-    usuario_db = db.get(Usuario, id_usuario)
+    usuario_db = db.scalar(
+        select(Usuario)
+        .options(joinedload(Usuario.deposito))
+        .where(Usuario.id_usuario == id_usuario)
+    )
     if not usuario_db:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return _serializar_usuario(usuario_db)
@@ -62,6 +90,8 @@ def crear_usuario(
     usuario_db = Usuario(
         nombre=nuevo_usuario.nombre,
         email=nuevo_usuario.email.lower(),
+        id_deposito=_validar_deposito(db, nuevo_usuario.id_deposito),
+        codigo_cuenta=_normalizar_codigo_cuenta(nuevo_usuario.codigo_cuenta),
         password_hash=bcrypt.hashpw(
             nuevo_usuario.password.encode(),
             bcrypt.gensalt(),
@@ -107,6 +137,10 @@ def actualizar_usuario(
         ).decode()
     if "email" in cambios:
         cambios["email"] = cambios["email"].lower()
+    if "id_deposito" in cambios:
+        cambios["id_deposito"] = _validar_deposito(db, cambios["id_deposito"])
+    if "codigo_cuenta" in cambios:
+        cambios["codigo_cuenta"] = _normalizar_codigo_cuenta(cambios["codigo_cuenta"])
     if "rol" in cambios:
         cambios["rol"] = _normalizar_rol(cambios["rol"])
     for campo, valor in cambios.items():

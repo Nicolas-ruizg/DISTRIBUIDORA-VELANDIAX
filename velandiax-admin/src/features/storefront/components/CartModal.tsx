@@ -18,6 +18,7 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
   // Datos del cliente para la creación del pedido
   const [formData, setFormData] = useState({
     nombre: '',
+    cedula: '',
     celular: '',
     direccion: '',
     notas: ''
@@ -48,9 +49,12 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
     // 1. Armamos el payload exacto que espera tu endpoint POST /admin/pedidos
     // Tu backend espera un PedidoCreate con el objeto 'cliente' y la lista de 'items'
     const pedidoPayload = {
-      cliente: { nombre: formData.nombre.trim(), celular: formData.celular.trim() },
+      cliente: { nombre: formData.nombre.trim(), cedula: formData.cedula.trim(), celular: formData.celular.trim() },
+      id_deposito: 'DEP001',
+      canal_venta: 'WEB',
+      tipo_envio: null,
       estado: 'PENDIENTE',
-      estado_pago: 'PAGO_50', // O añade "PENDIENTE" en tu backend para mayor precisión
+      estado_pago: 'CANCELADO',
       precio_envio: 0,
       es_mayorista: esMayorista,
       total: subtotal,
@@ -70,6 +74,7 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
       let mensaje = `¡Hola Velandiax! 🚀 Acabo de registrar el *Pedido #${pedidoGuardado.id_pedido}* en la web.\n\n`;
       mensaje += `👤 *Mis Datos:*\n`;
       mensaje += `- Nombre: ${formData.nombre}\n`;
+      mensaje += `- Cedula/NIT: ${formData.cedula}\n`;
       mensaje += `- Celular: ${formData.celular}\n`;
       mensaje += `- Dirección: ${formData.direccion}\n`;
       if (formData.notas) mensaje += `- Notas: ${formData.notas}\n`;
@@ -239,6 +244,11 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Nombre Completo *</label>
                   <input type="text" required value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full px-4 py-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-[#25D366] text-sm font-medium" placeholder="Ej: Juan Pérez" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Cedula / NIT *</label>
+                  <input type="text" required value={formData.cedula} onChange={e => setFormData({...formData, cedula: e.target.value})} className="w-full px-4 py-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-[#25D366] text-sm font-medium" placeholder="Ej: 1001234567" />
                 </div>
 
                 <div>

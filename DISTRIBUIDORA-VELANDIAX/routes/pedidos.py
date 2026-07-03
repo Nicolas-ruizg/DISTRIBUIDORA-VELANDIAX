@@ -7,8 +7,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from database.connection import get_db
-from database.models import Cliente, Envio, ItemPedido, Pedido, VarianteProducto
-from routes.admin import verificar_admin, verificar_ventas
+from database.models import Cliente, Deposito, Envio, ItemPedido, Pedido, VarianteProducto
+from routes.admin import ROL_ADMIN, normalizar_rol, verificar_admin, verificar_ventas
 from schemas.pedido import (
     PedidoCreate,
     PedidoDetalleResponse,
@@ -27,7 +27,18 @@ def _serializar_pedido_resumen(pedido: Pedido):
         "id_pedido": pedido.id_pedido,
         "id_cliente": pedido.id_cliente,
         "cliente": pedido.cliente.nombre,
+        "cedula_cliente": pedido.cliente.cedula,
         "celular": pedido.cliente.celular,
+        "id_deposito": pedido.id_deposito,
+        "deposito": pedido.deposito.nombre if pedido.deposito else None,
+        "canal_venta": pedido.canal_venta,
+        "tipo_envio": pedido.tipo_envio,
+        "id_usuario_venta": pedido.id_usuario_venta,
+        "vendedor": pedido.usuario_venta.nombre if pedido.usuario_venta else None,
+        "codigo_cuenta_vendedor": pedido.usuario_venta.codigo_cuenta if pedido.usuario_venta else None,
+        "id_usuario_inventario": pedido.id_usuario_inventario,
+        "inventario": pedido.usuario_inventario.nombre if pedido.usuario_inventario else None,
+        "codigo_cuenta_inventario": pedido.usuario_inventario.codigo_cuenta if pedido.usuario_inventario else None,
         "estado": pedido.estado,
         "estado_pago": pedido.estado_pago,
         "numero_guia": pedido.envio.numero_guia if pedido.envio else None,
@@ -54,6 +65,9 @@ def _serializar_item(item: ItemPedido):
 def _consulta_pedidos():
     return select(Pedido).options(
         joinedload(Pedido.cliente),
+        joinedload(Pedido.deposito),
+        joinedload(Pedido.usuario_venta),
+        joinedload(Pedido.usuario_inventario),
         joinedload(Pedido.envio),
         selectinload(Pedido.items)
         .joinedload(ItemPedido.variante)
@@ -90,17 +104,22 @@ def _obtener_o_crear_cliente(db: Session, pedido: PedidoCreate) -> Cliente:
             detail="Debe enviar id_cliente o datos del cliente",
         )
 
-    cliente_existente = None
-    if pedido.cliente.celular:
+    cliente_existente = db.scalar(
+        select(Cliente).where(Cliente.cedula == pedido.cliente.cedula.strip())
+    )
+    if not cliente_existente and pedido.cliente.celular:
         cliente_existente = db.scalar(
             select(Cliente).where(Cliente.celular == pedido.cliente.celular)
         )
     if cliente_existente:
         cliente_existente.nombre = pedido.cliente.nombre
+        cliente_existente.cedula = pedido.cliente.cedula.strip()
+        cliente_existente.celular = pedido.cliente.celular
         return cliente_existente
 
     cliente = Cliente(
         nombre=pedido.cliente.nombre,
+        cedula=pedido.cliente.cedula.strip(),
         celular=pedido.cliente.celular,
     )
     db.add(cliente)
@@ -124,7 +143,20 @@ def _normalizar_estado_pago(estado_pago: str) -> str:
     return estado_normalizado
 
 
-def _validar_envio_segun_pago(estado_pago: str, envio) -> None:
+def _validar_envio_segun_pago(canal_venta: str, estado_pago: str, envio) -> None:
+    if canal_venta == "PRESENCIAL":
+        if estado_pago == "PAGO_50":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La venta presencial no permite pago 50%",
+            )
+        if envio is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La venta presencial no genera datos de envio",
+            )
+        return
+
     if estado_pago in ESTADOS_PAGO_CON_ENVIO and envio is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -160,7 +192,11 @@ def _precio_item(variante: VarianteProducto, pedido_item, es_mayorista: bool) ->
     return variante.precio_mayorista if es_mayorista else variante.precio_minorista
 
 
-def _consultar_variantes_activas(db: Session, ids_variantes: set[int]):
+def _consultar_variantes_activas(
+    db: Session,
+    ids_variantes: set[int],
+    id_deposito: str | None = None,
+):
     variantes = db.scalars(
         select(VarianteProducto)
         .options(joinedload(VarianteProducto.producto))
@@ -186,7 +222,66 @@ def _consultar_variantes_activas(db: Session, ids_variantes: set[int]):
             detail=f"Variantes inactivas o con producto inactivo: {sorted(inactivas)}",
         )
 
+    if id_deposito:
+        fuera_deposito = [
+            variante.id_variante
+            for variante in variantes
+            if variante.producto.id_deposito != id_deposito
+        ]
+        if fuera_deposito:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Variantes de otro deposito: {sorted(fuera_deposito)}",
+            )
+
     return variantes_por_id
+
+
+def _validar_deposito(db: Session, id_deposito: str) -> str:
+    id_normalizado = id_deposito.strip().upper()
+    deposito = db.get(Deposito, id_normalizado)
+    if not deposito or not deposito.activo:
+        raise HTTPException(status_code=404, detail="Deposito no encontrado o inactivo")
+    return id_normalizado
+
+
+def _deposito_para_operacion(usuario: dict, id_deposito_solicitado: str) -> str:
+    if normalizar_rol(usuario.get("rol")) == ROL_ADMIN:
+        return id_deposito_solicitado
+
+    id_deposito_usuario = usuario.get("id_deposito")
+    if not id_deposito_usuario:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El usuario no tiene deposito asignado",
+        )
+    id_deposito_usuario = str(id_deposito_usuario).strip().upper()
+    if id_deposito_solicitado != id_deposito_usuario:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo puede operar el deposito asignado",
+        )
+    return id_deposito_usuario
+
+
+def _normalizar_canal_venta(canal_venta: str) -> str:
+    canal_normalizado = canal_venta.strip().upper()
+    if canal_normalizado not in {"PRESENCIAL", "WEB"}:
+        raise HTTPException(status_code=400, detail="canal_venta debe ser PRESENCIAL o WEB")
+    return canal_normalizado
+
+
+def _normalizar_tipo_envio(canal_venta: str, estado_pago: str, tipo_envio: str | None) -> str | None:
+    if canal_venta == "PRESENCIAL" or estado_pago == "CANCELADO":
+        return None
+
+    tipo_normalizado = (tipo_envio or "CONTRAENTREGA").strip().upper()
+    if tipo_normalizado not in {"CONTRAENTREGA", "GRATIS"}:
+        raise HTTPException(
+            status_code=400,
+            detail="tipo_envio debe ser CONTRAENTREGA o GRATIS",
+        )
+    return tipo_normalizado
 
 
 @router.get("", response_model=list[PedidoResumenResponse])
@@ -207,16 +302,29 @@ def crear_pedido(
     db: Session = Depends(get_db),
 ):
     estado_pago = _normalizar_estado_pago(pedido.estado_pago)
-    _validar_envio_segun_pago(estado_pago, pedido.envio)
+    canal_venta = _normalizar_canal_venta(pedido.canal_venta)
+    _validar_envio_segun_pago(canal_venta, estado_pago, pedido.envio)
+    tipo_envio = _normalizar_tipo_envio(canal_venta, estado_pago, pedido.tipo_envio)
+    id_deposito = _deposito_para_operacion(
+        usuario,
+        _validar_deposito(db, pedido.id_deposito),
+    )
 
     ids_variantes = {item.id_variante for item in pedido.items}
-    variantes_por_id = _consultar_variantes_activas(db, ids_variantes)
+    variantes_por_id = _consultar_variantes_activas(db, ids_variantes, id_deposito)
     cliente = _obtener_o_crear_cliente(db, pedido)
-    precio_envio = pedido.envio.costo if pedido.envio else pedido.precio_envio
+    precio_envio = Decimal("0") if canal_venta == "PRESENCIAL" else Decimal("0")
+    if pedido.envio:
+        pedido.envio.costo = Decimal("0")
 
     total_items = Decimal("0")
     pedido_db = Pedido(
         id_cliente=cliente.id_cliente,
+        id_deposito=id_deposito,
+        id_usuario_venta=usuario.get("id_usuario"),
+        id_usuario_inventario=pedido.id_usuario_inventario,
+        canal_venta=canal_venta,
+        tipo_envio=tipo_envio,
         estado=pedido.estado,
         estado_pago=estado_pago,
         precio_envio=precio_envio,
@@ -241,7 +349,7 @@ def crear_pedido(
 
     pedido_db.total = pedido.total if pedido.total is not None else total_items + precio_envio
 
-    if estado_pago in ESTADOS_PAGO_CON_ENVIO:
+    if canal_venta == "WEB" and estado_pago in ESTADOS_PAGO_CON_ENVIO:
         _crear_envio_automatico(db, pedido_db, pedido.envio)
 
     try:
@@ -287,8 +395,9 @@ def actualizar_pedido(
 
     if "estado_pago" in cambios:
         estado_pago = _normalizar_estado_pago(cambios["estado_pago"])
-        if estado_pago in ESTADOS_PAGO_CON_ENVIO and not pedido_db.envio:
-            _validar_envio_segun_pago(estado_pago, datos_envio)
+        canal_actual = cambios.get("canal_venta", pedido_db.canal_venta)
+        if canal_actual == "WEB" and estado_pago in ESTADOS_PAGO_CON_ENVIO and not pedido_db.envio:
+            _validar_envio_segun_pago(canal_actual, estado_pago, datos_envio)
             _crear_envio_automatico(db, pedido_db, datos_envio)
         elif estado_pago == "CANCELADO" and pedido_db.envio and pedido_db.envio.estado != "ENTREGADO":
             pedido_db.envio.estado = "CANCELADO"
@@ -298,6 +407,17 @@ def actualizar_pedido(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Para crear envio debe actualizar estado_pago a PAGO_50 o PAGO_TOTAL",
+        )
+
+    if "id_deposito" in cambios:
+        cambios["id_deposito"] = _validar_deposito(db, cambios["id_deposito"])
+    if "canal_venta" in cambios:
+        cambios["canal_venta"] = _normalizar_canal_venta(cambios["canal_venta"])
+    if "tipo_envio" in cambios or "estado_pago" in cambios or "canal_venta" in cambios:
+        cambios["tipo_envio"] = _normalizar_tipo_envio(
+            cambios.get("canal_venta", pedido_db.canal_venta),
+            cambios.get("estado_pago", pedido_db.estado_pago),
+            cambios.get("tipo_envio", pedido_db.tipo_envio),
         )
 
     for campo, valor in cambios.items():

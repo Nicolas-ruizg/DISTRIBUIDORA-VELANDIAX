@@ -5,6 +5,26 @@ export interface Categoria {
   descripcion: string | null;
 }
 
+export interface Deposito {
+  id_deposito: string;
+  nombre: string | null;
+  activo: boolean;
+  fecha_creacion: string;
+}
+
+export interface UsuarioAdmin {
+  id_usuario: number;
+  id_deposito: string | null;
+  deposito: string | null;
+  nombre: string;
+  email: string;
+  codigo_cuenta: string | null;
+  rol: 'ADMINISTRADOR' | 'VENDEDOR' | 'INVENTARIO';
+  activo: boolean;
+  fecha_creacion: string;
+  ultimo_acceso: string | null;
+}
+
 // --- IMÁGENES ---
 export interface ImagenProducto {
   id_imagen: number;
@@ -44,6 +64,8 @@ export interface ProductoResumen {
   codigo_producto: string;
   id_categoria: number;
   categoria: string;
+  id_deposito: string;
+  deposito: string | null;
   nombre: string;
   descripcion: string | null;
   paquete_estatico: boolean;
@@ -60,6 +82,8 @@ export interface ProductoDetalle {
   codigo_producto: string;
   id_categoria: number;
   categoria: string;
+  id_deposito: string;
+  deposito: string | null;
   nombre: string;
   descripcion: string | null;
   paquete_estatico: boolean;
@@ -75,7 +99,18 @@ export interface PedidoResumenResponse {
   id_pedido: number;
   id_cliente: number;
   cliente: string;
+  cedula_cliente: string | null;
   celular: string;
+  id_deposito: string;
+  deposito: string | null;
+  canal_venta: string;
+  tipo_envio: string | null;
+  id_usuario_venta: number | null;
+  vendedor: string | null;
+  codigo_cuenta_vendedor: string | null;
+  id_usuario_inventario: number | null;
+  inventario: string | null;
+  codigo_cuenta_inventario: string | null;
   estado: string;
   estado_pago: string;
   numero_guia: string | null;

@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class ProductoCreate(BaseModel):
     id_categoria: int = Field(gt=0)
+    id_deposito: str = Field(default="DEP001", min_length=2, max_length=20)
     codigo_producto: str = Field(min_length=2, max_length=60)
     nombre: str = Field(min_length=2, max_length=160)
     descripcion: Optional[str] = None
@@ -17,6 +18,7 @@ class ProductoCreate(BaseModel):
 
 class ProductoUpdate(BaseModel):
     id_categoria: Optional[int] = Field(None, gt=0)
+    id_deposito: Optional[str] = Field(None, min_length=2, max_length=20)
     codigo_producto: Optional[str] = Field(None, min_length=2, max_length=60)
     nombre: Optional[str] = Field(None, min_length=2, max_length=160)
     descripcion: Optional[str] = None
@@ -101,6 +103,8 @@ class ProductoResumenResponse(BaseModel):
     codigo_producto: str
     id_categoria: int
     categoria: str
+    id_deposito: str
+    deposito: Optional[str] = None
     nombre: str
     descripcion: Optional[str] = None
     paquete_estatico: bool
@@ -130,6 +134,8 @@ class ProductoDetalleResponse(BaseModel):
     codigo_producto: str
     id_categoria: int
     categoria: str
+    id_deposito: str
+    deposito: Optional[str] = None
     nombre: str
     descripcion: Optional[str] = None
     paquete_estatico: bool

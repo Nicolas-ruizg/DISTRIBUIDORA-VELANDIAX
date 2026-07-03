@@ -18,6 +18,7 @@ from database.connection import SessionLocal
 from database.models import (
     Categoria,
     Cliente,
+    Deposito,
     Envio,
     ImagenProducto,
     ImagenVarianteProducto,
@@ -158,16 +159,16 @@ PRODUCTOS = [
 
 
 CLIENTES = [
-    ("Laura Martinez", "3004101001"),
-    ("Moda Centro SAS", "3004101002"),
-    ("Camila Rodriguez", "3004101003"),
-    ("Boutique Isabella", "3004101004"),
-    ("Santiago Gomez", "3004101005"),
-    ("Almacen La 14", "3004101006"),
-    ("Daniela Torres", "3004101007"),
-    ("Distribuciones El Poblado", "3004101008"),
-    ("Valentina Castro", "3004101009"),
-    ("Comercializadora Andina", "3004101010"),
+    ("Laura Martinez", "1001001001", "3004101001"),
+    ("Moda Centro SAS", "900100100", "3004101002"),
+    ("Camila Rodriguez", "1001001003", "3004101003"),
+    ("Boutique Isabella", "900100104", "3004101004"),
+    ("Santiago Gomez", "1001001005", "3004101005"),
+    ("Almacen La 14", "900100106", "3004101006"),
+    ("Daniela Torres", "1001001007", "3004101007"),
+    ("Distribuciones El Poblado", "900100108", "3004101008"),
+    ("Valentina Castro", "1001001009", "3004101009"),
+    ("Comercializadora Andina", "900100110", "3004101010"),
 ]
 
 
@@ -292,18 +293,45 @@ def cargar_base(imagenes_producto, imagenes_variante):
                 variantes_producto,
                 producto,
                 categoria,
+                depositos,
                 usuarios
             RESTART IDENTITY CASCADE
         """))
 
+        depositos = [
+            Deposito(id_deposito="DEP001", nombre="Deposito 1", activo=True),
+            Deposito(id_deposito="DEP002", nombre="Deposito 2", activo=True),
+        ]
+        db.add_all(depositos)
+
         usuario = Usuario(
             nombre="Administrador VELANDIAX",
             email="admin@velandiax.com",
+            codigo_cuenta="ADMIN001",
             password_hash=bcrypt.hashpw(b"Admin123*", bcrypt.gensalt()).decode(),
             rol="ADMINISTRADOR",
             activo=True,
         )
         db.add(usuario)
+        vendedor = Usuario(
+            id_deposito="DEP001",
+            nombre="Vendedor VELANDIAX",
+            email="vendedor@velandiax.com",
+            codigo_cuenta="VEND001",
+            password_hash=bcrypt.hashpw(b"vendedor123*", bcrypt.gensalt()).decode(),
+            rol="VENDEDOR",
+            activo=True,
+        )
+        inventario = Usuario(
+            id_deposito="DEP001",
+            nombre="Inventario VELANDIAX",
+            email="inventario@velandiax.com",
+            codigo_cuenta="INV001",
+            password_hash=bcrypt.hashpw(b"inventario123*", bcrypt.gensalt()).decode(),
+            rol="INVENTARIO",
+            activo=True,
+        )
+        db.add_all([vendedor, inventario])
 
         categorias = {}
         for nombre, descripcion in CATEGORIAS:
@@ -317,6 +345,7 @@ def cargar_base(imagenes_producto, imagenes_variante):
         for indice, data in enumerate(PRODUCTOS, start=1):
             producto = Producto(
                 id_categoria=categorias[data["categoria"]].id_categoria,
+                id_deposito="DEP001" if indice % 2 else "DEP002",
                 codigo_producto=f"VX-{indice:03d}",
                 nombre=data["nombre"],
                 descripcion=data["descripcion"],
@@ -359,8 +388,8 @@ def cargar_base(imagenes_producto, imagenes_variante):
                 ))
 
         clientes = []
-        for nombre, celular in CLIENTES:
-            cliente = Cliente(nombre=nombre, celular=celular)
+        for nombre, cedula, celular in CLIENTES:
+            cliente = Cliente(nombre=nombre, cedula=cedula, celular=celular)
             db.add(cliente)
             clientes.append(cliente)
         db.flush()
@@ -428,6 +457,11 @@ def cargar_base(imagenes_producto, imagenes_variante):
         for venta in ventas:
             pedido = Pedido(
                 id_cliente=clientes[venta["cliente"]].id_cliente,
+                id_deposito="DEP001",
+                id_usuario_venta=vendedor.id_usuario,
+                id_usuario_inventario=inventario.id_usuario,
+                canal_venta="PRESENCIAL" if venta["mayorista"] else "WEB",
+                tipo_envio=None if venta["mayorista"] else "CONTRAENTREGA",
                 estado=venta["estado"],
                 estado_pago=venta["estado_pago"],
                 total=Decimal("0"),

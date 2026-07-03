@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Save, ArrowLeft, Plus, Package, Layers, Edit, Image as ImageIcon, Star, Trash2, UploadCloud, Tag, DollarSign, ImagePlus } from 'lucide-react';
 import apiClient from '../../api/axios';
-import type { Categoria, ProductoDetalle, Variante, ImagenProducto } from '../../types/index';
+import type { Categoria, Deposito, ProductoDetalle, Variante, ImagenProducto } from '../../types/index';
 
 const ATRIBUTOS_PREDEFINIDOS = ["Color", "Talla", "Material", "Marca", "Estilo", "Sabor", "Capacidad", "Dimensiones", "Peso", "Otro (Personalizado...)"];
 
@@ -12,6 +12,7 @@ export const ProductoFormView = () => {
   const isEditing = Boolean(id);
 
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [depositos, setDepositos] = useState<Deposito[]>([]);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   
@@ -20,6 +21,7 @@ export const ProductoFormView = () => {
     nombre: '', 
     descripcion: '', 
     id_categoria: 0, 
+    id_deposito: 'DEP001',
     paquete_estatico: false, 
     estado: 'ACTIVO',
     en_oferta: false,      // <-- Agregado
@@ -55,6 +57,7 @@ export const ProductoFormView = () => {
         nombre: p.nombre, 
         descripcion: p.descripcion || '', 
         id_categoria: p.id_categoria, 
+        id_deposito: p.id_deposito,
         paquete_estatico: p.paquete_estatico, 
         estado: p.estado,
         en_oferta: p.en_oferta,       // Mapeado de p
@@ -70,9 +73,14 @@ export const ProductoFormView = () => {
   useEffect(() => {
     const fetchInitial = async () => {
       try {
-        const catRes = await apiClient.get('/admin/categorias');
+        const [catRes, depRes] = await Promise.all([
+          apiClient.get('/admin/categorias'),
+          apiClient.get('/admin/depositos'),
+        ]);
         setCategorias(catRes.data);
+        setDepositos(depRes.data);
         if (!isEditing && catRes.data.length > 0) setProducto(prev => ({ ...prev, id_categoria: catRes.data[0].id_categoria }));
+        if (!isEditing && depRes.data.length > 0) setProducto(prev => ({ ...prev, id_deposito: depRes.data[0].id_deposito }));
         if (isEditing) await fetchProductoData();
       } catch (err) {
         alert('Error al inicializar.');
@@ -260,6 +268,22 @@ export const ProductoFormView = () => {
             <select required value={producto.id_categoria} onChange={(e) => setProducto({...producto, id_categoria: Number(e.target.value)})} className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none bg-white">
               {categorias.map(cat => <option key={cat.id_categoria} value={cat.id_categoria}>{cat.nombre}</option>)}
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Depósito *</label>
+            <select
+              required
+              value={producto.id_deposito}
+              onChange={(e) => setProducto({...producto, id_deposito: e.target.value})}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none bg-white"
+            >
+              {depositos.map(dep => (
+                <option key={dep.id_deposito} value={dep.id_deposito}>
+                  {dep.id_deposito} - {dep.nombre || 'Sin nombre'}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-400 mt-1">Ubicación donde queda disponible el artículo.</p>
           </div>
           <div className="flex items-center mt-6">
             <label className="flex items-center gap-3 cursor-pointer">
