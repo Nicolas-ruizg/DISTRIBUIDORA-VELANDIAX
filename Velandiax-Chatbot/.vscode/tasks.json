@@ -1,0 +1,71 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Velandiax: chatbot",
+      "type": "process",
+      "command": "python",
+      "args": [
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000",
+        "--reload"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": true,
+        "showReuseMessage": false
+      }
+    },
+    {
+      "label": "Velandiax: túnel WhatsApp",
+      "type": "process",
+      "command": "C:\\Program Files (x86)\\cloudflared\\cloudflared.exe",
+      "args": [
+        "tunnel",
+        "--url",
+        "http://127.0.0.1:8000",
+        "--no-autoupdate"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true,
+        "clear": true,
+        "showReuseMessage": false
+      }
+    },
+    {
+      "label": "Velandiax: iniciar todo",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "dependsOn": [
+        "Velandiax: chatbot",
+        "Velandiax: túnel WhatsApp"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "runOptions": {
+        "reevaluateOnRerun": true
+      }
+    }
+  ]
+}

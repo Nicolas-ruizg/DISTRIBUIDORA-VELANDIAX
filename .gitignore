@@ -11,8 +11,11 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.runtime/
+.tmp/
 
 .agents/
+data/orders.jsonl
 .DS_Store
 Thumbs.db
 
