@@ -47,7 +47,7 @@ export const ProductosView = () => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Catálogo de Productos</h2>
-          <p className="text-slate-500 text-sm mt-1">Gestiona tu inventario, paquetes y visibilidad</p>
+          <p className="text-slate-500 text-sm mt-1">Gestiona tu inventario, pacas y visibilidad</p>
         </div>
         <button 
           onClick={() => navigate('/admin/productos/nuevo')}
@@ -104,7 +104,7 @@ export const ProductosView = () => {
                           <div className="flex flex-col items-start gap-1">
                             <span className="font-bold text-slate-800">{producto.nombre}</span>
                             <div className="flex flex-wrap gap-2 mt-0.5">
-                              {producto.paquete_estatico && <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-black bg-slate-100 px-2 py-0.5 rounded-full"><Package size={10} /> Paquete</span>}
+                              {producto.paquete_estatico && <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-black bg-slate-100 px-2 py-0.5 rounded-full"><Package size={10} /> Por paca</span>}
                               {producto.estado === 'INACTIVO' && <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full"><XCircle size={10} /> Inactivo</span>}
                             </div>
                           </div>

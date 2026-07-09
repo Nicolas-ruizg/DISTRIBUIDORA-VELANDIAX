@@ -141,7 +141,7 @@ export const CategoryView = () => {
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-slate-300">Sin foto</div>
                     )}
-                    {prod.paquete_estatico && <div className="absolute top-2 left-2 bg-black text-white text-[10px] font-bold uppercase px-2 py-1 rounded shadow-md">Paquete</div>}
+                    {prod.paquete_estatico && <div className="absolute top-2 left-2 bg-black text-white text-[10px] font-bold uppercase px-2 py-1 rounded shadow-md">Por paca</div>}
                     
                     <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <button className="w-full bg-white/90 backdrop-blur text-black text-sm font-bold py-2 rounded shadow-lg hover:bg-black hover:text-white transition-colors flex items-center justify-center gap-2">

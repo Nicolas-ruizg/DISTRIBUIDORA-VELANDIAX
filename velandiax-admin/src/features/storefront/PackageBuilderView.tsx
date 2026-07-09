@@ -106,7 +106,7 @@ export const PackageBuilderView = () => {
 
   const prendasActuales = paca.reduce((acc, item) => acc + item.cantidad, 0);
   const espacioDisponible = CAPACIDAD_PACA - prendasActuales;
-  const precioTotalPaca = paca.reduce((acc, item) => acc + (item.variante.precio_mayorista * item.cantidad), 0);
+  const precioTotalPaca = paca.reduce((acc, item) => acc + (item.variante.precio_minorista * item.cantidad), 0);
 
   const handleAgregarAPaca = () => {
     if (!varianteSeleccionada || !productoDetalle) return alert('Selecciona todas las opciones.');
@@ -146,7 +146,7 @@ export const PackageBuilderView = () => {
           <Package size={40} /> Arma tu Paca
         </h1>
         <p className="text-slate-100 max-w-2xl mx-auto font-medium">
-          Primero elige una categoria y luego selecciona {CAPACIDAD_PACA} prendas para desbloquear precio mayorista.
+          Primero elige una categoria y luego selecciona {CAPACIDAD_PACA} prendas para armar tu paca.
         </p>
       </div>
 

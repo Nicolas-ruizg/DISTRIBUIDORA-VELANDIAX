@@ -116,10 +116,6 @@ export const ProductView = () => {
     ? varianteSeleccionada.precio_minorista 
     : Math.min(...producto.variantes.map(v => v.precio_minorista));
 
-  const precioMayoristaMostrar = varianteSeleccionada 
-    ? varianteSeleccionada.precio_mayorista 
-    : Math.min(...producto.variantes.map(v => v.precio_mayorista));
-
   const faltanAtributos = Object.keys(opcionesDisponibles).length > Object.keys(atributosSeleccionados).length;
 
   return (
@@ -155,7 +151,7 @@ export const ProductView = () => {
             )}
             {producto.paquete_estatico && (
               <span className="absolute top-4 left-4 bg-black text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full shadow-lg">
-                Paquete Mayorista
+                Por paca
               </span>
             )}
           </div>
@@ -177,11 +173,6 @@ export const ProductView = () => {
             <div className="flex items-end gap-3 mb-1">
               <span className="text-3xl font-black text-slate-900">{formatearDinero(precioMostrar)}</span>
               {!varianteSeleccionada && <span className="text-sm text-slate-500 font-medium mb-1.5">Precio desde</span>}
-            </div>
-            <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg inline-flex flex-col sm:flex-row sm:items-center gap-2 text-sm mt-2">
-              <span className="bg-slate-100 text-slate-800 font-bold px-2 py-0.5 rounded text-xs uppercase">Precio Mayorista</span>
-              <span className="font-bold text-slate-800">{formatearDinero(precioMayoristaMostrar)}</span>
-              <span className="text-slate-500 text-xs">/ud al llevar 6+ unidades.</span>
             </div>
           </div>
 
@@ -252,7 +243,7 @@ export const ProductView = () => {
           <div>
             <h3 className="text-lg font-bold text-slate-900 mb-3">Detalles del Producto</h3>
             <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">
-              {producto.descripcion || "Un producto excelente diseñado para brindarte la mejor calidad y estilo. Combínalo a tu gusto y aprovecha nuestros precios al por mayor."}
+              {producto.descripcion || "Un producto excelente diseñado para brindarte la mejor calidad y estilo. Combinalo a tu gusto y recibe atencion personalizada."}
             </p>
           </div>
 

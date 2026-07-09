@@ -75,7 +75,7 @@ export const FavoritesView = () => {
                   )}
                   {prod.paquete_estatico && (
                     <div className="absolute top-2 left-2 bg-black text-white text-[10px] font-bold uppercase px-2 py-1 rounded shadow-md">
-                      Paquete
+                      Por paca
                     </div>
                   )}
                   

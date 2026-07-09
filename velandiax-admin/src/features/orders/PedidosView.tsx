@@ -78,7 +78,7 @@ export const PedidosView = () => {
                     <td className="p-4 text-sm">
                       <div className="font-bold text-slate-800">{pedido.cliente}</div>
                       <div className="text-xs text-slate-500">CC/NIT: {pedido.cedula_cliente || 'N/A'}</div>
-                      <div className="text-xs text-slate-500">{pedido.celular} {pedido.es_mayorista && <span className="text-black font-bold ml-1">(Mayorista)</span>}</div>
+                      <div className="text-xs text-slate-500">{pedido.celular}</div>
                     </td>
                     <td className="p-4 text-xs text-slate-600">
                       <div><span className="font-bold">Deposito:</span> {pedido.id_deposito}</div>

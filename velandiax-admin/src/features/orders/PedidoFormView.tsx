@@ -27,7 +27,6 @@ export const PedidoFormView = () => {
   const [tipoEnvio, setTipoEnvio] = useState<TipoEnvio>('CONTRAENTREGA');
   const [depositos, setDepositos] = useState<Deposito[]>([]);
   const [idDeposito, setIdDeposito] = useState('DEP001');
-  const [esMayorista, setEsMayorista] = useState(false);
   const [estadoPago, setEstadoPago] = useState<EstadoPago>('PAGO_TOTAL');
   const [envioData, setEnvioData] = useState({
     transportadora: 'VELANDIAX EXPRESS',
@@ -105,10 +104,10 @@ export const PedidoFormView = () => {
 
   const subtotal = useMemo(() => {
     return cart.reduce((acc, item) => {
-      const precio = esMayorista ? item.variante.precio_mayorista : item.variante.precio_minorista;
+      const precio = item.variante.precio_minorista;
       return acc + (precio * item.cantidad);
     }, 0);
-  }, [cart, esMayorista]);
+  }, [cart]);
 
   const totalPedido = subtotal;
 
@@ -195,7 +194,7 @@ export const PedidoFormView = () => {
       estado: 'PENDIENTE',
       estado_pago: estadoPago,
       precio_envio: 0,
-      es_mayorista: esMayorista,
+      es_mayorista: false,
       envio: envioPayload,
       items: cart.map(item => ({
         id_variante: item.variante.id_variante,
@@ -311,19 +310,6 @@ export const PedidoFormView = () => {
               </div>
             </div>
 
-            <div className="mt-6 flex items-center gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
-              <div className="flex-1">
-                <p className="font-bold text-slate-800 text-sm">Aplicar precios mayoristas</p>
-                <p className="text-xs text-slate-500">Esto recalculara todos los items del carrito inmediatamente.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEsMayorista(!esMayorista)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${esMayorista ? 'bg-black' : 'bg-slate-300'}`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${esMayorista ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -383,7 +369,7 @@ export const PedidoFormView = () => {
                     <option value="">{selectedProductoId ? 'Seleccione...' : 'Primero elija un producto'}</option>
                     {variantesDisponibles.map(v => {
                       const attrs = Object.values(v.atributos).join(' - ') || 'Unica';
-                      const precioStr = esMayorista ? formatearDinero(v.precio_mayorista) : formatearDinero(v.precio_minorista);
+                      const precioStr = formatearDinero(v.precio_minorista);
                       return <option key={v.id_variante} value={v.id_variante}>ID:{v.id_variante} | {attrs} ({precioStr})</option>;
                     })}
                   </select>
@@ -417,7 +403,7 @@ export const PedidoFormView = () => {
                   <tr><td colSpan={5} className="p-8 text-center text-slate-400">El carrito esta vacio. Agrega productos arriba.</td></tr>
                 ) : (
                   cart.map((item, idx) => {
-                    const precio = esMayorista ? item.variante.precio_mayorista : item.variante.precio_minorista;
+                    const precio = item.variante.precio_minorista;
                     return (
                       <tr key={idx}>
                         <td className="p-4">

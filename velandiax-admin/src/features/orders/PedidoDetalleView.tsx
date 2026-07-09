@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, MapPin, Truck, RefreshCcw, CheckCircle } from 'lucide-react';
+import { ArrowLeft, User, MapPin, Truck, RefreshCcw, CheckCircle, Download, Printer } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import apiClient from '../../api/axios';
 import type { PedidoDetalle, Envio } from '../../types/index';
 
@@ -47,6 +48,121 @@ export const PedidoDetalleView = () => {
 
   const formatearDinero = (monto: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(monto);
 
+  const crearDocumentoPedido = () => {
+    if (!pedido) return null;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 18;
+
+    const addLine = (label: string, value: string | number | null | undefined) => {
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${label}:`, 14, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(String(value || 'N/A'), 52, y);
+      y += 7;
+    };
+
+    const ensureSpace = (space = 12) => {
+      if (y + space > 280) {
+        doc.addPage();
+        y = 18;
+      }
+    };
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text('VELANDIAX', 14, y);
+    doc.setFontSize(11);
+    doc.text(`Detalle de Pedido #${pedido.id_pedido}`, pageWidth - 14, y, { align: 'right' });
+    y += 10;
+
+    doc.setDrawColor(20, 20, 20);
+    doc.line(14, y, pageWidth - 14, y);
+    y += 10;
+
+    doc.setFontSize(11);
+    addLine('Fecha', new Date(pedido.fecha).toLocaleString('es-CO'));
+    addLine('Estado', pedido.estado);
+    addLine('Cliente', pedido.cliente);
+    addLine('Cedula/NIT', pedido.cedula_cliente);
+    addLine('Celular', pedido.celular);
+    addLine('Deposito', `${pedido.id_deposito}${pedido.deposito ? ` - ${pedido.deposito}` : ''}`);
+    addLine('Canal', pedido.canal_venta);
+    addLine('Tipo envio', pedido.tipo_envio || 'No aplica');
+    addLine('Vendedor', pedido.codigo_cuenta_vendedor || pedido.vendedor || 'N/A');
+
+    y += 4;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Articulos', 14, y);
+    y += 7;
+
+    doc.setFontSize(9);
+    doc.setFillColor(245, 245, 245);
+    doc.rect(14, y - 5, pageWidth - 28, 8, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.text('Producto', 16, y);
+    doc.text('Cant.', 112, y, { align: 'right' });
+    doc.text('Unitario', 150, y, { align: 'right' });
+    doc.text('Total', pageWidth - 16, y, { align: 'right' });
+    y += 7;
+
+    doc.setFont('helvetica', 'normal');
+    pedido.items_detalle.forEach((item) => {
+      ensureSpace(18);
+      const atributos = Object.entries(item.atributos).map(([k, v]) => `${k}: ${v}`).join(', ');
+      const producto = atributos ? `${item.producto} (${atributos})` : item.producto;
+      const lineasProducto = doc.splitTextToSize(producto, 85);
+      doc.text(lineasProducto, 16, y);
+      doc.text(String(item.cantidad), 112, y, { align: 'right' });
+      doc.text(formatearDinero(item.precio_unitario), 150, y, { align: 'right' });
+      doc.text(formatearDinero(item.precio_unitario * item.cantidad), pageWidth - 16, y, { align: 'right' });
+      y += Math.max(8, lineasProducto.length * 5);
+    });
+
+    y += 6;
+    doc.line(110, y, pageWidth - 14, y);
+    y += 8;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Subtotal:', 130, y, { align: 'right' });
+    doc.text(formatearDinero(pedido.total - pedido.precio_envio), pageWidth - 16, y, { align: 'right' });
+    y += 7;
+    doc.text('Envio:', 130, y, { align: 'right' });
+    doc.text(formatearDinero(pedido.precio_envio), pageWidth - 16, y, { align: 'right' });
+    y += 8;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total:', 130, y, { align: 'right' });
+    doc.text(formatearDinero(pedido.total), pageWidth - 16, y, { align: 'right' });
+
+    if (envio) {
+      y += 14;
+      ensureSpace(30);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Logistica', 14, y);
+      y += 7;
+      doc.setFont('helvetica', 'normal');
+      addLine('Transportadora', envio.transportadora);
+      addLine('Guia', envio.numero_guia);
+      addLine('Estado envio', envio.estado);
+    }
+
+    return doc;
+  };
+
+  const handleDescargarPDF = () => {
+    const doc = crearDocumentoPedido();
+    if (!doc || !pedido) return;
+    doc.save(`pedido-${pedido.id_pedido}.pdf`);
+  };
+
+  const handleImprimirPDF = () => {
+    const doc = crearDocumentoPedido();
+    if (!doc) return;
+    const url = doc.output('bloburl');
+    window.open(url, '_blank');
+  };
+
   // LA FUNCIÓN ESTRELLA: Actualizar estado manualmente
   const handleActualizarEstado = async () => {
     if (!pedido || nuevoEstado === pedido.estado) return;
@@ -72,7 +188,8 @@ export const PedidoDetalleView = () => {
     <div className="max-w-6xl mx-auto space-y-6 pb-20">
       
       {/* Encabezado */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-4">
         <button onClick={() => navigate('/admin/pedidos')} className="p-2 text-slate-400 hover:text-slate-600 bg-white rounded-lg border border-slate-200 shadow-sm cursor-pointer"><ArrowLeft size={20} /></button>
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
@@ -80,6 +197,15 @@ export const PedidoDetalleView = () => {
             <span className="bg-slate-800 text-white text-xs px-3 py-1 rounded-full">{pedido.estado}</span>
           </h2>
           <p className="text-slate-500 text-sm mt-1">{new Date(pedido.fecha).toLocaleString()}</p>
+        </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={handleDescargarPDF} className="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-800">
+            <Download size={16} /> Descargar PDF
+          </button>
+          <button onClick={handleImprimirPDF} className="bg-white text-slate-800 border border-slate-200 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50">
+            <Printer size={16} /> Imprimir
+          </button>
         </div>
       </div>
 
@@ -169,7 +295,6 @@ export const PedidoDetalleView = () => {
               <p><span className="text-slate-500">Nombre:</span> <span className="font-bold text-slate-800">{pedido.cliente}</span></p>
               <p><span className="text-slate-500">Cedula/NIT:</span> <span className="font-medium text-slate-800">{pedido.cedula_cliente || 'N/A'}</span></p>
               <p><span className="text-slate-500">Celular:</span> <span className="font-medium text-slate-800">{pedido.celular}</span></p>
-              <p><span className="text-slate-500">Tipo:</span> {pedido.es_mayorista ? <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded text-xs font-bold">Mayorista</span> : <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-bold">Minorista</span>}</p>
             </div>
           </div>
 

@@ -203,7 +203,11 @@ export const ProductoFormView = () => {
     });
     
     // Aquí enviamos el id_imagen (Asegúrate de recibirlo en el Pydantic Schema de tu backend)
-    const payload = { ...varianteForm, atributos: jsonAtributos };
+    const payload = {
+      ...varianteForm,
+      precio_mayorista: varianteForm.precio_minorista,
+      atributos: jsonAtributos,
+    };
     
     try {
       if (editingVarianteId) await apiClient.put(`/admin/variantes/${editingVarianteId}`, payload);
@@ -288,7 +292,7 @@ export const ProductoFormView = () => {
           <div className="flex items-center mt-6">
             <label className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" checked={producto.paquete_estatico} onChange={(e) => setProducto({...producto, paquete_estatico: e.target.checked})} className="w-5 h-5 text-blue-600 rounded" />
-              <span className="text-sm font-medium text-slate-700">Es un Paquete Estático</span>
+              <span className="text-sm font-medium text-slate-700">Por paca</span>
             </label>
           </div>
           <div className="md:col-span-2">
@@ -368,9 +372,9 @@ export const ProductoFormView = () => {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-              <thead><tr className="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200"><th className="p-4">SKU / Img</th><th className="p-4">Atributos</th><th className="p-4 text-right">Costo</th><th className="p-4 text-right">Minorista</th><th className="p-4 text-right">Mayorista</th><th className="p-4 text-center">Activa</th><th className="p-4 text-center">Acciones</th></tr></thead>
+              <thead><tr className="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200"><th className="p-4">SKU / Img</th><th className="p-4">Atributos</th><th className="p-4 text-right">Costo</th><th className="p-4 text-right">Precio</th><th className="p-4 text-center">Activa</th><th className="p-4 text-center">Acciones</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
-                {variantes.length === 0 ? (<tr><td colSpan={7} className="p-8 text-center text-slate-500">Agrega tu primera variante.</td></tr>) : (
+                {variantes.length === 0 ? (<tr><td colSpan={6} className="p-8 text-center text-slate-500">Agrega tu primera variante.</td></tr>) : (
                   variantes.map(v => {
                     const variantImage = v.imagenes?.find(i => i.es_principal)?.url || v.imagenes?.[0]?.url;
                     return (
@@ -384,7 +388,7 @@ export const ProductoFormView = () => {
                           </div>
                         </td>
                         <td className="p-4 text-sm flex gap-1 mt-2">{Object.entries(v.atributos).map(([k, val]) => (<span key={k} className="bg-slate-200 px-2 py-1 rounded text-[11px]">{k}: {val}</span>))}</td>
-                        <td className="p-4 text-sm text-right">${v.precio_costo}</td><td className="p-4 text-sm text-right text-blue-700">${v.precio_minorista}</td><td className="p-4 text-sm text-right text-emerald-700">${v.precio_mayorista}</td>
+                        <td className="p-4 text-sm text-right">${v.precio_costo}</td><td className="p-4 text-sm text-right text-blue-700">${v.precio_minorista}</td>
                         <td className="p-4 text-center"><button type="button" onClick={() => handleToggleVarianteStatus(v)} className={`relative inline-flex h-5 w-9 rounded-full ${v.estado === 'ACTIVO' ? 'bg-emerald-500' : 'bg-slate-300'} cursor-pointer`}><span className={`inline-block h-3 w-3 rounded-full bg-white transform transition-transform ${v.estado === 'ACTIVO' ? 'translate-x-5' : 'translate-x-1'} mt-1 ml-0.5`} /></button></td>
                         <td className="p-4 text-center"><button type="button" onClick={() => openVariantModal(v)} className="text-blue-600 font-bold text-xs cursor-pointer bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100">Editar</button></td>
                       </tr>
@@ -412,6 +416,13 @@ export const ProductoFormView = () => {
                   <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center">
                     {imagenPreview ? <img src={imagenPreview} alt="Preview" className="h-40 object-contain rounded-lg border border-slate-200 mb-2 shadow-sm" /> : <><UploadCloud size={40} className="text-slate-400 mb-3" /><span className="text-sm font-bold text-blue-600">Haz clic para seleccionar archivo</span><span className="text-xs text-slate-500 mt-1">Soporta JPG, PNG, WEBP (Max 5MB)</span></>}
                   </label>
+                  <div className="mt-4 text-left bg-white border border-slate-200 rounded-lg p-3 text-xs text-slate-600 space-y-1">
+                    <p className="font-bold text-slate-800">Tamaños recomendados para no distorsionar:</p>
+                    <p>Producto principal: 1200 x 1600 px, relación 3:4.</p>
+                    <p>Variantes y miniaturas: 900 x 1200 px, relación 3:4.</p>
+                    <p>Banners: 1920 x 900 px, relación 16:7 aprox.</p>
+                    <p>Usa fotos verticales, centradas y con margen; el sistema recorta con object-fit: cover.</p>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center">
@@ -453,17 +464,16 @@ export const ProductoFormView = () => {
                   {/* Precios */}
                   <div>
                     <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-3"><DollarSign size={16} /> Precios y Costos</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Costo Base ($)</label><input type="number" required min="0" step="0.01" value={varianteForm.precio_costo} onChange={e => setVarianteForm({...varianteForm, precio_costo: Number(e.target.value)})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-black" /></div>
-                      <div><label className="block text-xs font-bold text-blue-500 uppercase mb-1">Minorista ($)</label><input type="number" required min="0" step="0.01" value={varianteForm.precio_minorista} onChange={e => setVarianteForm({...varianteForm, precio_minorista: Number(e.target.value)})} className="w-full px-3 py-2 border border-blue-300 rounded-lg outline-none bg-blue-50/30 focus:ring-2 focus:ring-blue-600" /></div>
-                      <div><label className="block text-xs font-bold text-emerald-500 uppercase mb-1">Mayorista ($)</label><input type="number" required min="0" step="0.01" value={varianteForm.precio_mayorista} onChange={e => setVarianteForm({...varianteForm, precio_mayorista: Number(e.target.value)})} className="w-full px-3 py-2 border border-emerald-300 rounded-lg outline-none bg-emerald-50/30 focus:ring-2 focus:ring-emerald-600" /></div>
+                      <div><label className="block text-xs font-bold text-blue-500 uppercase mb-1">Precio ($)</label><input type="number" required min="0" step="0.01" value={varianteForm.precio_minorista} onChange={e => setVarianteForm({...varianteForm, precio_minorista: Number(e.target.value), precio_mayorista: Number(e.target.value)})} className="w-full px-3 py-2 border border-blue-300 rounded-lg outline-none bg-blue-50/30 focus:ring-2 focus:ring-blue-600" /></div>
                     </div>
                   </div>
 
                   {/* Logística */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                     <div><label className="block text-sm font-bold text-slate-700 mb-1">Peso Físico (Kg)</label><input type="number" min="0" step="0.01" value={varianteForm.peso} onChange={e => setVarianteForm({...varianteForm, peso: Number(e.target.value)})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-slate-400" /></div>
-                    <div className="flex items-center pt-6"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={varianteForm.aplica_paquete} onChange={e => setVarianteForm({...varianteForm, aplica_paquete: e.target.checked})} className="w-5 h-5 text-black rounded" /><span className="text-sm font-bold text-slate-700">Permitir en "Arma tu paquete"</span></label></div>
+                    <div className="flex items-center pt-6"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={varianteForm.aplica_paquete} onChange={e => setVarianteForm({...varianteForm, aplica_paquete: e.target.checked})} className="w-5 h-5 text-black rounded" /><span className="text-sm font-bold text-slate-700">Permitir en "Arma tu paca"</span></label></div>
                   </div>
 
                   {/* Atributos */}

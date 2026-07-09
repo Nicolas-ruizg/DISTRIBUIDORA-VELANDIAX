@@ -11,7 +11,6 @@ export interface CartItem {
 interface CartContextProps {
   items: CartItem[];
   totalItems: number;
-  esMayorista: boolean;
   subtotal: number;
   addToCart: (producto: ProductoDetalle, variante: Variante, cantidad: number) => void;
   removeFromCart: (id_variante: number) => void;
@@ -33,14 +32,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const totalItems = useMemo(() => items.reduce((acc, item) => acc + item.cantidad, 0), [items]);
   
-  const esMayorista = totalItems >= 6;
-
   const subtotal = useMemo(() => {
     return items.reduce((acc, item) => {
-      const precio = esMayorista ? item.variante.precio_mayorista : item.variante.precio_minorista;
+      const precio = item.variante.precio_minorista;
       return acc + (precio * item.cantidad);
     }, 0);
-  }, [items, esMayorista]);
+  }, [items]);
 
   const addToCart = (producto: ProductoDetalle, variante: Variante, cantidad: number) => {
     setItems(prev => {
@@ -72,7 +69,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const clearCart = () => setItems([]);
 
   return (
-    <CartContext.Provider value={{ items, totalItems, esMayorista, subtotal, addToCart, removeFromCart, updateQuantity, clearCart }}>
+    <CartContext.Provider value={{ items, totalItems, subtotal, addToCart, removeFromCart, updateQuantity, clearCart }}>
       {children}
     </CartContext.Provider>
   );
