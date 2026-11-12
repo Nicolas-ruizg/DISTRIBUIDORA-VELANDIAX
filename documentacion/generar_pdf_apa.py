@@ -33,6 +33,7 @@ from reportlab.platypus.tableofcontents import TableOfContents
 ROOT = Path(__file__).resolve().parents[1]
 OUT = Path(__file__).resolve().parent / "Documentacion_Tecnica_Integral_VELANDIAX_APA.pdf"
 SENA_LOGO = Path(__file__).resolve().parent / "sena_logo.png"
+CAPTURE_DIR = Path(__file__).resolve().parent / "capturas"
 
 
 def register_fonts() -> tuple[str, str, str, str]:
@@ -229,6 +230,16 @@ styles = {
         leftIndent=0.5 * inch,
         firstLineIndent=-0.5 * inch,
         alignment=TA_LEFT,
+    ),
+    "caption": ParagraphStyle(
+        "CaptionVX",
+        parent=sample["Normal"],
+        fontName=ITALIC_FONT,
+        fontSize=10,
+        leading=14,
+        alignment=TA_CENTER,
+        spaceBefore=5,
+        spaceAfter=10,
     ),
 }
 
@@ -613,7 +624,7 @@ story.append(P("Hay índices para categoría, código y depósito de producto; d
 story.append(H2("8.4 Migraciones SQL"))
 migration_rows = [[p.name, "Script incremental o esquema consolidado"] for p in sorted((ROOT / "DISTRIBUIDORA-VELANDIAX" / "database").glob("*.sql"))]
 story.append(table(["Archivo", "Función"], migration_rows, [3.1*inch, 3.4*inch], 8))
-story.append(P("Hallazgo: add_stock_variantes.sql no está rastreado por Git y stock no aparece todavía en schema_final.sql, aunque el modelo y la aplicación dependen de él."))
+story.append(P("Hallazgo: add_stock_variantes.sql está rastreado como migración complementaria, pero stock todavía no aparece integrado en schema_final.sql, aunque el modelo y la aplicación dependen de él."))
 
 story.append(H1("9. Backend FastAPI"))
 story.append(P("main.py registra CORS, routers y un lifespan que inicia el simulador. connection.py usa URL.create, pool_pre_ping y sesiones cerradas por dependencia. Los modelos siguen SQLAlchemy 2.0 y Pydantic valida longitudes, rangos y enumeraciones."))
@@ -649,6 +660,40 @@ story.append(H2("10.2 Panel"))
 story.append(table(["Vista", "Función"], [["LoginView", "Autenticación."], ["Dashboard", "Métricas por tiempo, vendedor, referencia y depósito."], ["CategoriasView", "Gestión de categorías."], ["ProductosView/Form", "Código, depósito, oferta, variantes, stock e imágenes."], ["PedidoFormView", "Venta presencial/web y búsqueda por código."], ["PedidosView/Detalle", "Historial, pago, factura y guía."], ["DepositosView", "Alta, edición y desactivación."], ["UsuariosView", "Roles, códigos y depósito."]], [2.2*inch, 4.3*inch], 8))
 story.append(H2("10.3 Estado e impresión"))
 story.append(P("Carrito y favoritos se conservan en localStorage. El JWT usa admin_token y el usuario admin_user. jsPDF crea detalle, factura y guía térmica. La impresión depende del controlador y diálogo del navegador; para impresión silenciosa se requeriría QZ Tray o agente local."))
+
+story.append(PageBreak())
+story.append(H2("10.4 Evidencias visuales y diferenciación de perfiles"))
+story.append(P("Las siguientes evidencias fueron capturadas sobre la versión desplegada en velandiax.com.co, con una resolución de 1440 por 900 píxeles. Permiten comprobar la identidad visual de la tienda, la administración centralizada y la aplicación del control de acceso basado en roles."))
+
+store_capture = CAPTURE_DIR / "01_tienda_publica.jpg"
+if store_capture.exists():
+    story.append(Image(str(store_capture), width=6.5 * inch, height=4.0625 * inch))
+    story.append(Paragraph("Figura 1. Página principal de la tienda pública VELANDIAX.", styles["caption"]))
+story.append(P("La interfaz pública prioriza la búsqueda de referencias, la navegación por categorías, el acceso a ofertas y la modalidad Arma tu paca. El banner comunica la propuesta comercial con una composición adaptable a escritorio."))
+
+story.append(PageBreak())
+admin_capture = CAPTURE_DIR / "02_perfil_administrador.jpg"
+if admin_capture.exists():
+    story.append(Image(str(admin_capture), width=6.5 * inch, height=4.0625 * inch))
+    story.append(Paragraph("Figura 2. Dashboard del perfil ADMINISTRADOR.", styles["caption"]))
+story.append(P("El administrador dispone de acceso integral al dashboard, categorías, productos, registro e historial de ventas, depósitos y usuarios. El tablero incorpora filtros por periodo, vendedor, depósito y referencia; además resume ingresos, pedidos, catálogo y clientes."))
+story.extend(bullet([
+    "Administra usuarios, roles y asignación de depósitos.",
+    "Consulta métricas globales y trazabilidad comercial.",
+    "Gestiona catálogo, inventario, pedidos, pagos, facturas y guías.",
+]))
+
+story.append(PageBreak())
+vendor_capture = CAPTURE_DIR / "03_perfil_vendedor.jpg"
+if vendor_capture.exists():
+    story.append(Image(str(vendor_capture), width=6.5 * inch, height=4.0625 * inch))
+    story.append(Paragraph("Figura 3. Vista restringida del perfil VENDEDOR.", styles["caption"]))
+story.append(P("El vendedor únicamente visualiza Registrar Venta. Puede identificar al cliente, seleccionar el depósito asignado, definir el canal, localizar artículos por código y crear la venta. No tiene acceso al dashboard, historial, catálogo administrativo, depósitos ni usuarios."))
+story.extend(bullet([
+    "El menú se filtra por rol mediante AdminLayout y RoleRoute.",
+    "La API vuelve a validar el JWT y el rol; ocultar opciones en React no sustituye la autorización del backend.",
+    "La identidad VEND001 mostrada es demostrativa y se proyectó en la capa cliente sin modificar usuarios ni contraseñas de producción.",
+]))
 
 story.append(H1("11. Chatbot de WhatsApp"))
 story.append(P("La segunda aplicación FastAPI verifica GET /webhook y recibe POST /webhook. Valida opcionalmente HMAC SHA-256, acepta rápido y procesa en BackgroundTasks. Una cola de 2.000 IDs deduplica mensajes dentro de una instancia."))
@@ -694,12 +739,12 @@ commit_details = [
     ("b6b845c", "PDF, guía térmica y etiquetas Por paca."),
 ]
 story.append(table(["Commit", "Aporte"], commit_details, [1.0*inch, 5.5*inch], 8))
-story.append(H2("14.2 Cambios locales pendientes"))
+story.append(H2("14.2 Estado local durante la generación"))
 status_lines = git("status", "--short").splitlines()
-story.append(P(f"El directorio de trabajo contiene {sum(1 for line in status_lines if line.startswith(' M'))} archivos modificados y {sum(1 for line in status_lines if line.startswith('??'))} rutas no rastreadas. Incluye inventario, endpoint público de pedido, corrección FOR UPDATE, TikTok, footer, WhatsApp, checkout, PDF y tipos. database/add_stock_variantes.sql y routes.zip todavía no están rastreados."))
+story.append(P(f"Al generar esta edición, el directorio de trabajo contiene {sum(1 for line in status_lines if line.startswith(' M'))} archivos modificados y {sum(1 for line in status_lines if line.startswith('??'))} rutas no rastreadas. Corresponden a la incorporación de evidencias visuales y a la actualización del documento; los archivos de entorno y artefactos temporales permanecen excluidos mediante .gitignore."))
 
 story.append(H1("15. Calidad, pruebas y validación"))
-story.append(table(["Componente", "Comando", "Resultado observado"], [["Backend", "python -m compileall -q .", "Correcto; advertencias de dependencias."], ["Frontend", "npm run build", "Correcto; 2.028 módulos."], ["Frontend", "Bundle", "JS principal 874,98 kB; advertencia >500 kB."], ["Chatbot", "python -m pytest -q", "No ejecutado: pytest no instalado en Python global y sin .venv."], ["Chatbot", "tests/", "Suite versionada para bot, webhook y WhatsApp."]], [1.2*inch, 2.0*inch, 3.3*inch], 8))
+story.append(table(["Componente", "Comando", "Resultado observado"], [["Backend", "python -m compileall -q .", "Correcto; sin errores de sintaxis."], ["Frontend", "npm run build", "Correcto; 2.028 módulos."], ["Frontend", "Bundle", "JS principal 874,98 kB; advertencia >500 kB."], ["Chatbot", "python -m pytest -q", "Correcto: 7 pruebas aprobadas."], ["Chatbot", "tests/", "Suite versionada para bot, webhook y WhatsApp."]], [1.2*inch, 2.0*inch, 3.3*inch], 8))
 story.append(H2("15.1 Cobertura recomendada"))
 story.extend(bullet(["Unitarias para totales, volumen y estados.", "Integración PostgreSQL para concurrencia/stock.", "Autorización por rol y depósito.", "Contratos entre Pydantic y TypeScript.", "E2E de producto a entrega.", "CI con compileall, pytest, npm ci, lint y build."]))
 
@@ -721,7 +766,7 @@ story.extend(bullet(["schema_final.sql no incluye stock.", "precio_mayorista y e
 story.append(H1("19. Hoja de ruta"))
 story.append(table(["Horizonte", "Acciones"], [["Inmediato", "Commit local; integrar stock; retirar routes.zip; pruebas chatbot; respaldo."], ["1-2 semanas", "Alembic, rate limit, idempotencia, auditoría y CI."], ["1 mes", "Redis, trabajador logístico, observabilidad y code splitting."], ["2-3 meses", "Facturación formal, impresión administrada, códigos de barras y movimientos."], ["Continuo", "Dependencias, OWASP, backups probados y documentación por release."]], [1.3*inch, 5.2*inch], 8))
 
-add_section(story, "20. Conclusiones", ["VELANDIAX ya es una solución operativa y no solo una maqueta: integra dominio comercial, persistencia, inventario, roles, depósitos, canales web/WhatsApp, seguimiento e impresión. La arquitectura es comprensible y adecuada para el tamaño actual.", "El riesgo principal es operativo: funcionalidades críticas permanecen sin commit y el esquema consolidado no representa completamente el modelo vigente. La prioridad es reconciliar migraciones, confirmar cambios, endurecer endpoints públicos y automatizar validación y despliegue."])
+add_section(story, "20. Conclusiones", ["VELANDIAX ya es una solución operativa y no solo una maqueta: integra dominio comercial, persistencia, inventario, roles, depósitos, canales web/WhatsApp, seguimiento e impresión. La arquitectura es comprensible y adecuada para el tamaño actual.", "La evidencia visual confirma una separación clara entre la experiencia pública, la gestión integral del administrador y el alcance operativo del vendedor. La prioridad técnica restante es reconciliar el esquema consolidado con todas las migraciones, endurecer endpoints públicos y automatizar validación y despliegue."])
 
 story.append(H1("Referencias"))
 references = [
