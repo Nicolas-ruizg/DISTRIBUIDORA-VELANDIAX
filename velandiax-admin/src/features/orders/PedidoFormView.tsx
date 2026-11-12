@@ -55,7 +55,7 @@ export const PedidoFormView = () => {
           apiClient.get('/admin/productos', { params: { incluir_inactivos: false, incluir_variantes_inactivas: false } }),
           apiClient.get('/admin/depositos'),
         ]);
-        setProductos(productosRes.data.filter((p: ProductoResumen) => p.estado === 'ACTIVO'));
+        setProductos(productosRes.data.filter((p: ProductoResumen) => p.estado === 'ACTIVO' && p.stock_total > 0));
         setDepositos(depositosRes.data);
         if (depositosRes.data.length > 0) setIdDeposito(depositosRes.data[0].id_deposito);
       } catch {
@@ -75,7 +75,7 @@ export const PedidoFormView = () => {
       try {
         const res = await apiClient.get(`/admin/productos/${selectedProductoId}`);
         const prod: ProductoDetalle = res.data;
-        setVariantesDisponibles(prod.variantes.filter(v => v.estado === 'ACTIVO'));
+        setVariantesDisponibles(prod.variantes.filter(v => v.estado === 'ACTIVO' && v.stock > 0));
         setSelectedVarianteId('');
       } catch {
         alert('Error al cargar variantes.');
@@ -134,6 +134,13 @@ export const PedidoFormView = () => {
     const productoBase = productos.find(p => p.id_producto === selectedProductoId);
     const variante = variantesDisponibles.find(v => v.id_variante === selectedVarianteId);
     if (!productoBase || !variante) return;
+    const cantidadEnCarrito = cart
+      .filter(item => item.variante.id_variante === variante.id_variante)
+      .reduce((acc, item) => acc + item.cantidad, 0);
+    if (cantidadEnCarrito + cantidadItem > variante.stock) {
+      alert(`Stock insuficiente. Disponible: ${variante.stock}, ya agregado: ${cantidadEnCarrito}.`);
+      return;
+    }
 
     const existIndex = cart.findIndex(item => item.variante.id_variante === variante.id_variante);
     if (existIndex >= 0) {
@@ -370,7 +377,7 @@ export const PedidoFormView = () => {
                     {variantesDisponibles.map(v => {
                       const attrs = Object.values(v.atributos).join(' - ') || 'Unica';
                       const precioStr = formatearDinero(v.precio_minorista);
-                      return <option key={v.id_variante} value={v.id_variante}>ID:{v.id_variante} | {attrs} ({precioStr})</option>;
+                      return <option key={v.id_variante} value={v.id_variante}>ID:{v.id_variante} | {attrs} ({precioStr}) | Stock: {v.stock}</option>;
                     })}
                   </select>
                 </div>

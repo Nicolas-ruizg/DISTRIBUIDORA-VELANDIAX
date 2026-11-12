@@ -20,3 +20,7 @@ data/orders.jsonl
 Thumbs.db
 
 *.log
+*.zip
+
+documentacion/revision/
+documentacion/plantilla_revision/

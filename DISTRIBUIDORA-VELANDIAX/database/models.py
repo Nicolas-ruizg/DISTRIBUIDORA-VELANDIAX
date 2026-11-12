@@ -132,6 +132,7 @@ class VarianteProducto(Base):
             "estado IN ('ACTIVO', 'INACTIVO')",
             name="ck_variante_producto_estado_orm",
         ),
+        CheckConstraint("stock >= 0", name="ck_variante_producto_stock_orm"),
     )
 
     id_variante: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -142,6 +143,7 @@ class VarianteProducto(Base):
     precio_costo: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     precio_minorista: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     precio_mayorista: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    stock: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     peso: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     aplica_paquete: Mapped[bool] = mapped_column(Boolean, default=False)
     atributos: Mapped[dict | None] = mapped_column(JSONB)

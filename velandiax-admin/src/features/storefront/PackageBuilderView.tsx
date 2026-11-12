@@ -31,7 +31,7 @@ export const PackageBuilderView = () => {
         ]);
         setCategorias(catRes.data);
         setProductos(
-          prodRes.data.filter((p: ProductoResumen) => p.estado === 'ACTIVO' && !p.paquete_estatico)
+          prodRes.data.filter((p: ProductoResumen) => p.estado === 'ACTIVO' && !p.paquete_estatico && p.stock_total > 0)
         );
       } catch (err) {
         console.error(err);
@@ -74,7 +74,7 @@ export const PackageBuilderView = () => {
   const opcionesDisponibles = useMemo(() => {
     if (!productoDetalle) return {};
     const opciones: Record<string, Set<string>> = {};
-    const variantesValidas = productoDetalle.variantes.filter(v => v.estado === 'ACTIVO' && v.aplica_paquete);
+    const variantesValidas = productoDetalle.variantes.filter(v => v.estado === 'ACTIVO' && v.aplica_paquete && v.stock > 0);
 
     variantesValidas.forEach(v => {
       Object.entries(v.atributos as Record<string, string>).forEach(([key, val]) => {
@@ -90,7 +90,7 @@ export const PackageBuilderView = () => {
 
   const varianteSeleccionada = useMemo(() => {
     if (!productoDetalle) return null;
-    const variantesValidas = productoDetalle.variantes.filter(v => v.estado === 'ACTIVO' && v.aplica_paquete);
+    const variantesValidas = productoDetalle.variantes.filter(v => v.estado === 'ACTIVO' && v.aplica_paquete && v.stock > 0);
 
     if (Object.keys(opcionesDisponibles).length === 0 && variantesValidas.length > 0) {
       return variantesValidas[0];
@@ -106,11 +106,18 @@ export const PackageBuilderView = () => {
 
   const prendasActuales = paca.reduce((acc, item) => acc + item.cantidad, 0);
   const espacioDisponible = CAPACIDAD_PACA - prendasActuales;
+  const cantidadMaximaQuick = Math.min(espacioDisponible, varianteSeleccionada?.stock || espacioDisponible);
   const precioTotalPaca = paca.reduce((acc, item) => acc + (item.variante.precio_minorista * item.cantidad), 0);
 
   const handleAgregarAPaca = () => {
     if (!varianteSeleccionada || !productoDetalle) return alert('Selecciona todas las opciones.');
     if (cantidadQuick > espacioDisponible) return alert(`Solo te queda espacio para ${espacioDisponible} prenda(s) en esta paca.`);
+    const cantidadYaAgregada = paca
+      .filter(item => item.variante.id_variante === varianteSeleccionada.id_variante)
+      .reduce((acc, item) => acc + item.cantidad, 0);
+    if (cantidadYaAgregada + cantidadQuick > varianteSeleccionada.stock) {
+      return alert(`Solo hay ${varianteSeleccionada.stock} unidad(es) disponibles de esta variante.`);
+    }
 
     setPaca(prev => {
       const existe = prev.findIndex(item => item.variante.id_variante === varianteSeleccionada.id_variante);
@@ -197,6 +204,27 @@ export const PackageBuilderView = () => {
               <span className="text-sm font-bold text-slate-500">{productosCategoria.length} productos</span>
             </div>
 
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+              <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
+                Lista desplegable de productos
+              </label>
+              <select
+                value={selectedProductId || ''}
+                onChange={(event) => setSelectedProductId(event.target.value ? Number(event.target.value) : null)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-black"
+              >
+                <option value="">Selecciona una referencia de {selectedCategoria.nombre}</option>
+                {productosCategoria.map(prod => (
+                  <option key={prod.id_producto} value={prod.id_producto}>
+                    {prod.codigo_producto} - {prod.nombre}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-400 mt-2">
+                Tambien puedes elegir el producto desde las tarjetas visuales de abajo.
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {productosCategoria.map(prod => (
                 <div key={prod.id_producto} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group">
@@ -281,10 +309,13 @@ export const PackageBuilderView = () => {
 
                         <div className="pt-4">
                           <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Cantidad</h4>
+                          {varianteSeleccionada && (
+                            <p className="text-xs text-slate-400 mb-2">Stock disponible: {varianteSeleccionada.stock}</p>
+                          )}
                           <div className="flex items-center border border-slate-200 rounded-lg w-28 h-10">
                             <button type="button" onClick={() => setCantidadQuick(Math.max(1, cantidadQuick - 1))} className="w-10 flex justify-center text-slate-500 font-bold cursor-pointer">-</button>
                             <input type="number" value={cantidadQuick} readOnly className="flex-1 text-center font-bold text-slate-900 bg-transparent outline-none" />
-                            <button type="button" onClick={() => setCantidadQuick(Math.min(espacioDisponible, cantidadQuick + 1))} className="w-10 flex justify-center text-slate-500 font-bold cursor-pointer">+</button>
+                            <button type="button" onClick={() => setCantidadQuick(Math.min(cantidadMaximaQuick, cantidadQuick + 1))} className="w-10 flex justify-center text-slate-500 font-bold cursor-pointer">+</button>
                           </div>
                         </div>
                       </div>

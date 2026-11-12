@@ -51,6 +51,7 @@ export interface Variante {
   precio_costo: number;
   precio_minorista: number;
   precio_mayorista: number;
+  stock: number;
   peso: number | null;
   aplica_paquete: boolean;
   atributos: Record<string, string>;
@@ -73,6 +74,7 @@ export interface ProductoResumen {
   precio_anterior: number | null; // Nuevo campo de tu backend
   estado: string;
   variantes: number;           // Cantidad de variantes totales
+  stock_total: number;
   precio_desde: number | null;
   imagen_principal: string | null;
 }

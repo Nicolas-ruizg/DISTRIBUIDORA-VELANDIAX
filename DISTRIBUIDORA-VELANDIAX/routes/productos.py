@@ -47,12 +47,18 @@ MAX_IMAGEN_BYTES = int(os.getenv("MAX_IMAGEN_BYTES", str(5 * 1024 * 1024)))
 def _variantes_visibles(
     producto: Producto,
     incluir_variantes_inactivas: bool = False,
+    incluir_sin_stock: bool = False,
 ):
     variantes = producto.variantes
     if not incluir_variantes_inactivas:
         variantes = [
             variante for variante in variantes
             if variante.estado == "ACTIVO"
+        ]
+    if not incluir_sin_stock:
+        variantes = [
+            variante for variante in variantes
+            if variante.stock > 0
         ]
     return sorted(variantes, key=lambda item: item.id_variante)
 
@@ -195,8 +201,13 @@ def _imagen_principal_variante(variante: VarianteProducto):
 def _serializar_producto_resumen(
     producto: Producto,
     incluir_variantes_inactivas: bool = False,
+    incluir_sin_stock: bool = False,
 ):
-    variantes = _variantes_visibles(producto, incluir_variantes_inactivas)
+    variantes = _variantes_visibles(
+        producto,
+        incluir_variantes_inactivas,
+        incluir_sin_stock,
+    )
     precios = [variante.precio_minorista for variante in variantes]
     return {
         "id_producto": producto.id_producto,
@@ -212,6 +223,7 @@ def _serializar_producto_resumen(
         "precio_anterior": producto.precio_anterior,
         "estado": producto.estado,
         "variantes": len(variantes),
+        "stock_total": sum(variante.stock for variante in variantes),
         "precio_desde": min(precios) if precios else None,
         "imagen_principal": _imagen_principal(producto),
     }
@@ -227,6 +239,7 @@ def _serializar_variante(
         "precio_costo": variante.precio_costo,
         "precio_minorista": variante.precio_minorista,
         "precio_mayorista": variante.precio_mayorista,
+        "stock": variante.stock,
         "peso": variante.peso,
         "aplica_paquete": variante.aplica_paquete,
         "atributos": variante.atributos or {},
@@ -245,6 +258,7 @@ def _serializar_producto_detalle(
     producto: Producto,
     incluir_variantes_inactivas: bool = False,
     incluir_imagenes_inactivas: bool = False,
+    incluir_sin_stock: bool = False,
 ):
     return {
         "id_producto": producto.id_producto,
@@ -271,6 +285,7 @@ def _serializar_producto_detalle(
             for variante in _variantes_visibles(
                 producto,
                 incluir_variantes_inactivas,
+                incluir_sin_stock,
             )
         ],
     }
@@ -370,6 +385,7 @@ def _listar_productos(
     incluir_paquetes: bool = True,
     incluir_inactivos: bool = False,
     incluir_variantes_inactivas: bool = False,
+    incluir_sin_stock: bool = False,
     id_deposito: str | None = None,
 ):
     consulta = (
@@ -392,10 +408,16 @@ def _listar_productos(
         consulta = consulta.where(Producto.id_deposito == id_deposito)
 
     productos = db.scalars(consulta).all()
-    return [
-        _serializar_producto_resumen(producto, incluir_variantes_inactivas)
-        for producto in productos
-    ]
+    resultados = []
+    for producto in productos:
+        resumen = _serializar_producto_resumen(
+            producto,
+            incluir_variantes_inactivas,
+            incluir_sin_stock,
+        )
+        if incluir_sin_stock or resumen["stock_total"] > 0:
+            resultados.append(resumen)
+    return resultados
 
 
 @router.get("/productos", response_model=list[ProductoResumenResponse])
@@ -427,13 +449,20 @@ def listar_productos_admin(
         incluir_paquetes=incluir_paquetes,
         incluir_inactivos=incluir_inactivos,
         incluir_variantes_inactivas=incluir_variantes_inactivas,
+        incluir_sin_stock=True,
         id_deposito=id_deposito_usuario,
     )
 
 
 @router.get("/productos/{id_producto}", response_model=ProductoDetalleResponse)
 def obtener_producto(id_producto: int, db: Session = Depends(get_db)):
-    return _serializar_producto_detalle(_consultar_producto(db, id_producto))
+    detalle = _serializar_producto_detalle(_consultar_producto(db, id_producto))
+    if not detalle["variantes"]:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Producto sin inventario disponible",
+        )
+    return detalle
 
 
 @router.get("/admin/productos/{id_producto}", response_model=ProductoDetalleResponse)
@@ -446,6 +475,7 @@ def obtener_producto_admin(
         _consultar_producto(db, id_producto, incluir_inactivo=True, usuario=usuario),
         incluir_variantes_inactivas=True,
         incluir_imagenes_inactivas=True,
+        incluir_sin_stock=True,
     )
 
 
@@ -478,6 +508,7 @@ def crear_producto(
         _consultar_producto(db, producto_db.id_producto, incluir_inactivo=True),
         incluir_variantes_inactivas=True,
         incluir_imagenes_inactivas=True,
+        incluir_sin_stock=True,
     )
 
 
@@ -521,6 +552,7 @@ def actualizar_producto(
         _consultar_producto(db, id_producto, incluir_inactivo=True),
         incluir_variantes_inactivas=True,
         incluir_imagenes_inactivas=True,
+        incluir_sin_stock=True,
     )
 
 

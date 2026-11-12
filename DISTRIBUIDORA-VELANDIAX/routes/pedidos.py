@@ -17,6 +17,7 @@ from schemas.pedido import (
 )
 
 router = APIRouter(prefix="/admin/pedidos", tags=["pedidos"])
+public_router = APIRouter(tags=["pedidos"])
 
 ESTADOS_PAGO = {"PAGO_50", "PAGO_TOTAL", "CANCELADO"}
 ESTADOS_PAGO_CON_ENVIO = {"PAGO_50", "PAGO_TOTAL"}
@@ -199,8 +200,9 @@ def _consultar_variantes_activas(
 ):
     variantes = db.scalars(
         select(VarianteProducto)
-        .options(joinedload(VarianteProducto.producto))
+        .options(selectinload(VarianteProducto.producto))
         .where(VarianteProducto.id_variante.in_(ids_variantes))
+        .with_for_update(of=VarianteProducto)
     ).all()
     variantes_por_id = {variante.id_variante: variante for variante in variantes}
 
@@ -235,6 +237,50 @@ def _consultar_variantes_activas(
             )
 
     return variantes_por_id
+
+
+def _deposito_desde_variantes(variantes_por_id: dict[int, VarianteProducto]) -> str:
+    depositos = {
+        variante.producto.id_deposito
+        for variante in variantes_por_id.values()
+        if variante.producto is not None
+    }
+    if not depositos:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El pedido no tiene productos validos",
+        )
+    if len(depositos) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El pedido web solo puede mezclar productos del mismo deposito",
+        )
+    return next(iter(depositos))
+
+
+def _validar_y_descontar_stock(variantes_por_id: dict[int, VarianteProducto], items) -> None:
+    cantidades_por_variante: dict[int, int] = {}
+    for item in items:
+        cantidades_por_variante[item.id_variante] = (
+            cantidades_por_variante.get(item.id_variante, 0) + item.cantidad
+        )
+
+    sin_stock = []
+    for id_variante, cantidad in cantidades_por_variante.items():
+        variante = variantes_por_id[id_variante]
+        if variante.stock < cantidad:
+            sin_stock.append(
+                f"{id_variante} disponible {variante.stock}, solicitado {cantidad}"
+            )
+
+    if sin_stock:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Stock insuficiente: {', '.join(sin_stock)}",
+        )
+
+    for id_variante, cantidad in cantidades_por_variante.items():
+        variantes_por_id[id_variante].stock -= cantidad
 
 
 def _validar_deposito(db: Session, id_deposito: str) -> str:
@@ -295,23 +341,31 @@ def listar_pedidos(
     return [_serializar_pedido_resumen(pedido) for pedido in pedidos]
 
 
-@router.post("", response_model=PedidoDetalleResponse, status_code=status.HTTP_201_CREATED)
-def crear_pedido(
+def _crear_pedido_db(
     pedido: PedidoCreate,
-    usuario: dict = Depends(verificar_ventas),
-    db: Session = Depends(get_db),
+    db: Session,
+    usuario: dict | None = None,
+    publico: bool = False,
 ):
     estado_pago = _normalizar_estado_pago(pedido.estado_pago)
     canal_venta = _normalizar_canal_venta(pedido.canal_venta)
     _validar_envio_segun_pago(canal_venta, estado_pago, pedido.envio)
     tipo_envio = _normalizar_tipo_envio(canal_venta, estado_pago, pedido.tipo_envio)
-    id_deposito = _deposito_para_operacion(
-        usuario,
-        _validar_deposito(db, pedido.id_deposito),
-    )
 
     ids_variantes = {item.id_variante for item in pedido.items}
-    variantes_por_id = _consultar_variantes_activas(db, ids_variantes, id_deposito)
+    if publico:
+        variantes_por_id = _consultar_variantes_activas(db, ids_variantes)
+        id_deposito = _deposito_desde_variantes(variantes_por_id)
+    else:
+        if usuario is None:
+            raise HTTPException(status_code=401, detail="Usuario no autenticado")
+        id_deposito = _deposito_para_operacion(
+            usuario,
+            _validar_deposito(db, pedido.id_deposito),
+        )
+        variantes_por_id = _consultar_variantes_activas(db, ids_variantes, id_deposito)
+
+    _validar_y_descontar_stock(variantes_por_id, pedido.items)
     cliente = _obtener_o_crear_cliente(db, pedido)
     precio_envio = Decimal("0") if canal_venta == "PRESENCIAL" else Decimal("0")
     if pedido.envio:
@@ -321,7 +375,7 @@ def crear_pedido(
     pedido_db = Pedido(
         id_cliente=cliente.id_cliente,
         id_deposito=id_deposito,
-        id_usuario_venta=usuario.get("id_usuario"),
+        id_usuario_venta=usuario.get("id_usuario") if usuario else None,
         id_usuario_inventario=pedido.id_usuario_inventario,
         canal_venta=canal_venta,
         tipo_envio=tipo_envio,
@@ -362,6 +416,23 @@ def crear_pedido(
         ) from exc
 
     return _serializar_pedido_detalle(_consultar_pedido(db, pedido_db.id_pedido))
+
+
+@public_router.post("/pedidos", response_model=PedidoDetalleResponse, status_code=status.HTTP_201_CREATED)
+def crear_pedido_web(
+    pedido: PedidoCreate,
+    db: Session = Depends(get_db),
+):
+    return _crear_pedido_db(pedido=pedido, db=db, publico=True)
+
+
+@router.post("", response_model=PedidoDetalleResponse, status_code=status.HTTP_201_CREATED)
+def crear_pedido(
+    pedido: PedidoCreate,
+    usuario: dict = Depends(verificar_ventas),
+    db: Session = Depends(get_db),
+):
+    return _crear_pedido_db(pedido=pedido, db=db, usuario=usuario)
 
 
 @router.get("/{id_pedido}", response_model=PedidoDetalleResponse)

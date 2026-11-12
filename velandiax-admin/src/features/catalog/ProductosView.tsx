@@ -78,6 +78,7 @@ export const ProductosView = () => {
                   <th className="p-4 font-medium">Categoría</th>
                   <th className="p-4 font-medium">Depósito</th>
                   <th className="p-4 font-medium text-center">Variantes</th>
+                  <th className="p-4 font-medium text-center">Stock</th>
                   <th className="p-4 font-medium">Precio Base</th>
                   <th className="p-4 font-medium text-center">Visible</th>
                   <th className="p-4 font-medium text-right">Acciones</th>
@@ -85,7 +86,7 @@ export const ProductosView = () => {
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {productos.length === 0 ? (
-                  <tr><td colSpan={8} className="p-8 text-center text-slate-500">No hay productos registrados.</td></tr>
+                  <tr><td colSpan={9} className="p-8 text-center text-slate-500">No hay productos registrados.</td></tr>
                 ) : (
                   productos.map((producto) => (
                     <tr key={producto.id_producto} className={`transition-colors ${producto.estado === 'INACTIVO' ? 'bg-slate-50 opacity-70' : 'hover:bg-slate-50'}`}>
@@ -116,6 +117,11 @@ export const ProductosView = () => {
                       <td className="p-4 text-sm text-center">
                         <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold ${producto.variantes > 0 ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
                           {producto.variantes} Vars.
+                        </span>
+                      </td>
+                      <td className="p-4 text-sm text-center">
+                        <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold ${producto.stock_total > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                          {producto.stock_total}
                         </span>
                       </td>
                       <td className="p-4 text-sm font-bold text-slate-800">

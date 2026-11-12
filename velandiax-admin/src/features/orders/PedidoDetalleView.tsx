@@ -150,6 +150,171 @@ export const PedidoDetalleView = () => {
     return doc;
   };
 
+  const abrirDocumentoParaImprimir = (doc: jsPDF) => {
+    const url = doc.output('bloburl');
+    window.open(url, '_blank');
+  };
+
+  const crearTicketFactura = () => {
+    if (!pedido) return null;
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: [80, 180],
+    });
+    let y = 8;
+    const width = 80;
+
+    const center = (text: string, size = 9, bold = false) => {
+      doc.setFontSize(size);
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      doc.text(text, width / 2, y, { align: 'center' });
+      y += size > 10 ? 6 : 4.5;
+    };
+
+    const row = (label: string, value: string) => {
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, 5, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(value, 75, y, { align: 'right' });
+      y += 4;
+    };
+
+    center('VELANDIAX', 14, true);
+    center(`FACTURA / PEDIDO #${pedido.id_pedido}`, 8, true);
+    center(new Date(pedido.fecha).toLocaleString('es-CO'), 7);
+    doc.line(5, y, 75, y);
+    y += 5;
+
+    row('Cliente', pedido.cliente);
+    row('Ced/NIT', pedido.cedula_cliente || 'N/A');
+    row('Celular', pedido.celular);
+    row('Deposito', pedido.id_deposito);
+    y += 2;
+    doc.line(5, y, 75, y);
+    y += 5;
+
+    pedido.items_detalle.forEach((item) => {
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      const producto = doc.splitTextToSize(item.producto, 50);
+      doc.text(producto, 5, y);
+      doc.text(`x${item.cantidad}`, 58, y);
+      doc.text(formatearDinero(item.precio_unitario * item.cantidad), 75, y, { align: 'right' });
+      y += Math.max(5, producto.length * 4);
+      const atributos = Object.entries(item.atributos).map(([k, v]) => `${k}: ${v}`).join(' / ');
+      if (atributos) {
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(90);
+        doc.text(doc.splitTextToSize(atributos, 70), 5, y);
+        doc.setTextColor(0);
+        y += 4;
+      }
+    });
+
+    y += 2;
+    doc.line(5, y, 75, y);
+    y += 5;
+    row('Subtotal', formatearDinero(pedido.total - pedido.precio_envio));
+    row('Envio', formatearDinero(pedido.precio_envio));
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOTAL', 5, y + 2);
+    doc.text(formatearDinero(pedido.total), 75, y + 2, { align: 'right' });
+    y += 10;
+    center('Gracias por tu compra', 8, true);
+
+    return doc;
+  };
+
+  const crearEtiquetaGuia = () => {
+    if (!pedido || !envio) return null;
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: [100, 150],
+    });
+    let y = 10;
+
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.6);
+    doc.rect(5, 5, 90, 140);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('VELANDIAX', 50, y, { align: 'center' });
+    y += 8;
+    doc.setFontSize(9);
+    doc.text('GUIA DE ENVIO', 50, y, { align: 'center' });
+    y += 6;
+    doc.line(8, y, 92, y);
+    y += 8;
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('GUIA:', 8, y);
+    doc.setFontSize(16);
+    doc.text(envio.numero_guia || `PED-${pedido.id_pedido}`, 92, y, { align: 'right' });
+    y += 10;
+
+    doc.setFontSize(8);
+    doc.line(8, y, 92, y);
+    y += 7;
+
+    const addBlock = (title: string, lines: string[]) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.text(title, 8, y);
+      y += 5;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      lines.forEach((line) => {
+        const split = doc.splitTextToSize(line || 'N/A', 82);
+        doc.text(split, 8, y);
+        y += Math.max(5, split.length * 5);
+      });
+      y += 3;
+    };
+
+    addBlock('DESTINATARIO', [
+      envio.nombre_destinatario || pedido.cliente,
+      `Cel: ${envio.celular_destinatario || pedido.celular}`,
+    ]);
+
+    addBlock('DIRECCION', [
+      envio.direccion,
+      `${envio.ciudad || ''}${envio.departamento ? ` - ${envio.departamento}` : ''}`,
+    ]);
+
+    addBlock('TRANSPORTADORA', [
+      envio.transportadora,
+      `Pedido #${pedido.id_pedido} - ${pedido.tipo_envio || 'Envio'}`,
+    ]);
+
+    doc.line(8, y, 92, y);
+    y += 8;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text('CONTENIDO:', 8, y);
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${pedido.items} item(s) - ${formatearDinero(pedido.total)}`, 8, y);
+    y += 8;
+
+    if (envio.notas) {
+      addBlock('NOTAS', [envio.notas]);
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.text('Formato sugerido: etiqueta 100 x 150 mm / 203 DPI', 50, 142, { align: 'center' });
+
+    return doc;
+  };
+
   const handleDescargarPDF = () => {
     const doc = crearDocumentoPedido();
     if (!doc || !pedido) return;
@@ -159,8 +324,22 @@ export const PedidoDetalleView = () => {
   const handleImprimirPDF = () => {
     const doc = crearDocumentoPedido();
     if (!doc) return;
-    const url = doc.output('bloburl');
-    window.open(url, '_blank');
+    abrirDocumentoParaImprimir(doc);
+  };
+
+  const handleImprimirFacturaTermica = () => {
+    const doc = crearTicketFactura();
+    if (!doc) return;
+    abrirDocumentoParaImprimir(doc);
+  };
+
+  const handleImprimirGuia = () => {
+    const doc = crearEtiquetaGuia();
+    if (!doc) {
+      alert('Este pedido no tiene guia de envio generada.');
+      return;
+    }
+    abrirDocumentoParaImprimir(doc);
   };
 
   // LA FUNCIÓN ESTRELLA: Actualizar estado manualmente
@@ -199,12 +378,18 @@ export const PedidoDetalleView = () => {
           <p className="text-slate-500 text-sm mt-1">{new Date(pedido.fecha).toLocaleString()}</p>
         </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={handleDescargarPDF} className="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-800">
             <Download size={16} /> Descargar PDF
           </button>
           <button onClick={handleImprimirPDF} className="bg-white text-slate-800 border border-slate-200 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50">
-            <Printer size={16} /> Imprimir
+            <Printer size={16} /> Imprimir PDF
+          </button>
+          <button onClick={handleImprimirFacturaTermica} className="bg-white text-slate-800 border border-slate-200 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50">
+            <Printer size={16} /> Factura impresora
+          </button>
+          <button onClick={handleImprimirGuia} className="bg-white text-slate-800 border border-slate-200 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50">
+            <Truck size={16} /> Guia envio
           </button>
         </div>
       </div>
@@ -321,6 +506,15 @@ export const PedidoDetalleView = () => {
                   <p className="text-xs text-slate-500 mt-1">{envio.transportadora}</p>
                 </div>
                 <p><span className="text-slate-500">Estado logístico:</span> <span className="font-bold text-slate-800">{envio.estado}</span></p>
+                <button
+                  onClick={handleImprimirGuia}
+                  className="w-full bg-black text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-800"
+                >
+                  <Printer size={16} /> Imprimir guia 100 x 150 mm
+                </button>
+                <p className="text-[11px] text-slate-400">
+                  Para la impresora USB/LAN de etiquetas, selecciona papel 100 x 150 mm y escala 100%.
+                </p>
               </div>
             ) : (
               <div className="text-center py-4">

@@ -48,7 +48,7 @@ export const ProductView = () => {
     if (!producto) return {};
     const opciones: Record<string, Set<string>> = {};
     
-    producto.variantes.forEach(v => {
+    producto.variantes.filter(v => v.stock > 0).forEach(v => {
       Object.entries(v.atributos).forEach(([key, val]) => {
         if (!opciones[key]) opciones[key] = new Set();
         opciones[key].add(val);
@@ -64,12 +64,13 @@ export const ProductView = () => {
 
   const varianteSeleccionada = useMemo(() => {
     if (!producto || producto.variantes.length === 0) return null;
+    const variantesConStock = producto.variantes.filter(v => v.stock > 0);
     
     if (Object.keys(opcionesDisponibles).length === 0) {
-      return producto.variantes[0];
+      return variantesConStock[0] || null;
     }
 
-    return producto.variantes.find(v => {
+    return variantesConStock.find(v => {
       const keysVariante = Object.keys(v.atributos);
       if (keysVariante.length !== Object.keys(atributosSeleccionados).length) return false;
       
@@ -97,6 +98,7 @@ export const ProductView = () => {
 
   const handleAddToCart = () => {
     if (!varianteSeleccionada || !producto) return alert("Por favor selecciona todas las opciones.");
+    if (cantidad > varianteSeleccionada.stock) return alert(`Solo hay ${varianteSeleccionada.stock} unidad(es) disponibles.`);
     
     // Agregamos al Context Global
     addToCart(producto, varianteSeleccionada, cantidad);
@@ -114,9 +116,11 @@ export const ProductView = () => {
 
   const precioMostrar = varianteSeleccionada 
     ? varianteSeleccionada.precio_minorista 
-    : Math.min(...producto.variantes.map(v => v.precio_minorista));
+    : Math.min(...producto.variantes.filter(v => v.stock > 0).map(v => v.precio_minorista));
 
   const faltanAtributos = Object.keys(opcionesDisponibles).length > Object.keys(atributosSeleccionados).length;
+  const sinStock = !varianteSeleccionada || varianteSeleccionada.stock <= 0;
+  const cantidadMaxima = varianteSeleccionada?.stock || 1;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -206,18 +210,24 @@ export const ProductView = () => {
             )}
           </div>
 
+          {varianteSeleccionada && (
+            <p className={`text-sm font-bold mb-4 ${varianteSeleccionada.stock > 3 ? 'text-emerald-600' : 'text-amber-600'}`}>
+              Disponibles: {varianteSeleccionada.stock} unidad(es)
+            </p>
+          )}
+
           <div className="flex items-center gap-4 mb-8">
             <div className="flex items-center border-2 border-slate-200 rounded-lg w-32 h-12">
               <button onClick={() => setCantidad(Math.max(1, cantidad - 1))} className="w-10 h-full flex items-center justify-center text-slate-500 hover:text-black font-bold text-xl transition-colors">-</button>
               <input type="number" value={cantidad} readOnly className="flex-1 h-full w-full text-center font-bold text-lg text-slate-900 bg-transparent outline-none" />
-              <button onClick={() => setCantidad(cantidad + 1)} className="w-10 h-full flex items-center justify-center text-slate-500 hover:text-black font-bold text-xl transition-colors">+</button>
+              <button onClick={() => setCantidad(Math.min(cantidadMaxima, cantidad + 1))} className="w-10 h-full flex items-center justify-center text-slate-500 hover:text-black font-bold text-xl transition-colors">+</button>
             </div>
 
             <button 
               onClick={handleAddToCart}
-              disabled={faltanAtributos}
+              disabled={faltanAtributos || sinStock}
               className={`flex-1 h-12 rounded-lg flex items-center justify-center gap-2 font-bold uppercase tracking-wide transition-all shadow-xl cursor-pointer ${
-                faltanAtributos 
+                faltanAtributos || sinStock
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
                   : agregado 
                     ? 'bg-emerald-500 text-white scale-[1.02]' 
@@ -225,7 +235,7 @@ export const ProductView = () => {
               }`}
             >
               <ShoppingBag size={20} />
-              {faltanAtributos ? 'Selecciona Opciones' : agregado ? '¡Añadido al Carrito!' : 'Añadir al Carrito'}
+              {faltanAtributos ? 'Selecciona Opciones' : sinStock ? 'Sin stock' : agregado ? '¡Añadido al Carrito!' : 'Añadir al Carrito'}
             </button>
           </div>
 

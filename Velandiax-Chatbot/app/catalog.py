@@ -38,14 +38,10 @@ class Product:
 
 class Catalog:
     def __init__(self, products: list[Product]):
-        if not products:
-            raise ValueError("El catalogo debe contener al menos un producto")
         self.products = products
         self.by_sku = {product.sku.upper(): product for product in products}
 
     def replace(self, products: list[Product]) -> None:
-        if not products:
-            raise ValueError("El catalogo remoto no contiene productos vendibles")
         self.products = products
         self.by_sku = {product.sku.upper(): product for product in products}
 

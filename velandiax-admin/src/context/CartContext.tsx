@@ -42,13 +42,17 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const addToCart = (producto: ProductoDetalle, variante: Variante, cantidad: number) => {
     setItems(prev => {
       const existeIndex = prev.findIndex(item => item.variante.id_variante === variante.id_variante);
+      const cantidadSegura = Math.min(Math.max(1, cantidad), variante.stock);
       
       if (existeIndex >= 0) {
         const nuevoCarrito = [...prev];
-        nuevoCarrito[existeIndex].cantidad += cantidad;
+        nuevoCarrito[existeIndex].cantidad = Math.min(
+          variante.stock,
+          nuevoCarrito[existeIndex].cantidad + cantidadSegura,
+        );
         return nuevoCarrito;
       }
-      return [...prev, { producto, variante, cantidad }];
+      return [...prev, { producto, variante, cantidad: cantidadSegura }];
     });
   };
 
@@ -62,7 +66,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     setItems(prev => prev.map(item => 
-      item.variante.id_variante === id_variante ? { ...item, cantidad } : item
+      item.variante.id_variante === id_variante ? { ...item, cantidad: Math.min(cantidad, item.variante.stock) } : item
     ));
   };
 

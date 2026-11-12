@@ -82,6 +82,7 @@ class VarianteCreate(BaseModel):
     precio_costo: Decimal = Field(ge=0)
     precio_minorista: Decimal = Field(ge=0)
     precio_mayorista: Decimal = Field(ge=0)
+    stock: int = Field(default=0, ge=0)
     peso: Optional[Decimal] = Field(None, ge=0)
     aplica_paquete: bool = False
     atributos: dict[str, Any] = Field(default_factory=dict)
@@ -92,6 +93,7 @@ class VarianteUpdate(BaseModel):
     precio_costo: Optional[Decimal] = Field(None, ge=0)
     precio_minorista: Optional[Decimal] = Field(None, ge=0)
     precio_mayorista: Optional[Decimal] = Field(None, ge=0)
+    stock: Optional[int] = Field(None, ge=0)
     peso: Optional[Decimal] = Field(None, ge=0)
     aplica_paquete: Optional[bool] = None
     atributos: Optional[dict[str, Any]] = None
@@ -112,6 +114,7 @@ class ProductoResumenResponse(BaseModel):
     precio_anterior: Optional[float] = None
     estado: str
     variantes: int
+    stock_total: int
     precio_desde: Optional[Decimal] = None
     imagen_principal: Optional[str] = None
 
@@ -122,6 +125,7 @@ class VarianteProductoResponse(BaseModel):
     precio_costo: Decimal
     precio_minorista: Decimal
     precio_mayorista: Decimal
+    stock: int
     peso: Optional[Decimal] = None
     aplica_paquete: bool
     atributos: dict[str, Any]

@@ -38,6 +38,11 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
   const handleProcessOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) return;
+    const depositosPedido = Array.from(new Set(items.map(item => item.producto.id_deposito)));
+    if (depositosPedido.length > 1) {
+      alert('Tu carrito tiene productos de diferentes depositos. Por ahora debes hacer un pedido por deposito.');
+      return;
+    }
 
     setSaving(true);
     const pedidoPayload = {
@@ -46,7 +51,7 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
         cedula: formData.cedula.trim(),
         celular: formData.celular.trim(),
       },
-      id_deposito: 'DEP001',
+      id_deposito: depositosPedido[0],
       canal_venta: 'WEB',
       tipo_envio: null,
       estado: 'PENDIENTE',
@@ -62,9 +67,9 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
     };
 
     try {
-      const res = await apiClient.post('/admin/pedidos', pedidoPayload);
+      const res = await apiClient.post('/pedidos', pedidoPayload);
       const pedidoGuardado = res.data;
-      const telefonoVelandiax = '573194215464';
+      const telefonoVelandiax = '573042176422';
       let mensaje = `Hola Velandiax. Acabo de registrar el Pedido #${pedidoGuardado.id_pedido} en la web.\n\n`;
       mensaje += `Mis datos:\n`;
       mensaje += `- Nombre: ${formData.nombre}\n`;
@@ -89,19 +94,20 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
       onClose();
     } catch (err: any) {
       console.error(err);
-      alert(err.response?.data?.detail || 'No fue posible registrar tu pedido. Intentalo de nuevo.');
+      const detail = err.response?.data?.detail;
+      alert(typeof detail === 'string' ? detail : 'No fue posible registrar tu pedido. Intentalo de nuevo.');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+    <div className="fixed inset-0 z-[70] overflow-hidden">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onClick={onClose} />
 
-      <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-white flex flex-col shadow-2xl animate-slideLeft">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div className="absolute inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10">
+        <div className="h-full w-screen max-w-md bg-white flex flex-col shadow-2xl animate-slideLeft">
+          <div className="shrink-0 p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
             {step === 'cart' ? (
               <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
                 <ShoppingBag size={20} /> Tu Carrito ({totalItems})
@@ -124,7 +130,7 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
 
           {step === 'cart' && (
             <>
-              <div className="flex-1 overflow-y-auto p-6 space-y-6 hide-scrollbar">
+              <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 hide-scrollbar">
                 {items.length === 0 ? (
                   <div className="text-center py-20 text-slate-400">
                     <ShoppingBag size={48} className="mx-auto mb-4 opacity-30" />
@@ -162,10 +168,11 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
                             <div className="flex items-center border border-slate-200 rounded-md h-8 bg-white">
                               <button type="button" onClick={() => updateQuantity(item.variante.id_variante, item.cantidad - 1)} className="w-8 h-full flex items-center justify-center text-slate-500 hover:text-black font-bold cursor-pointer">-</button>
                               <span className="w-8 text-center text-xs font-bold text-slate-800">{item.cantidad}</span>
-                              <button type="button" onClick={() => updateQuantity(item.variante.id_variante, item.cantidad + 1)} className="w-8 h-full flex items-center justify-center text-slate-500 hover:text-black font-bold cursor-pointer">+</button>
+                              <button type="button" onClick={() => updateQuantity(item.variante.id_variante, item.cantidad + 1)} disabled={item.cantidad >= item.variante.stock} className="w-8 h-full flex items-center justify-center text-slate-500 hover:text-black font-bold cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">+</button>
                             </div>
                             <button type="button" onClick={() => removeFromCart(item.variante.id_variante)} className="text-slate-400 hover:text-red-500 p-1 cursor-pointer transition-colors ml-auto"><Trash2 size={16} /></button>
                           </div>
+                          <p className="text-[10px] text-slate-400 mt-1">Stock disponible: {item.variante.stock}</p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="font-black text-sm text-slate-900">{formatearDinero(totalItem)}</p>
@@ -178,7 +185,7 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
               </div>
 
               {items.length > 0 && (
-                <div className="p-6 border-t border-slate-100 bg-slate-50 space-y-4">
+                <div className="shrink-0 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] border-t border-slate-100 bg-slate-50 space-y-4">
                   <div className="flex justify-between text-slate-900 font-black text-xl">
                     <span>Subtotal:</span>
                     <span className="text-slate-900">{formatearDinero(subtotal)}</span>
@@ -198,8 +205,8 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
           )}
 
           {step === 'checkout' && (
-            <form onSubmit={handleProcessOrder} className="flex flex-col h-full">
-              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            <form onSubmit={handleProcessOrder} className="flex flex-1 min-h-0 flex-col">
+              <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
                 <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl text-center mb-2">
                   <MessageCircle size={32} className="mx-auto text-emerald-500 mb-2 fill-emerald-500" />
                   <h3 className="font-bold text-emerald-900 text-sm">Ingresa tus datos</h3>
@@ -232,7 +239,7 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
                 </div>
               </div>
 
-              <div className="p-6 border-t border-slate-100 bg-white">
+              <div className="shrink-0 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] border-t border-slate-100 bg-white shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
                 <button
                   type="submit"
                   disabled={saving}

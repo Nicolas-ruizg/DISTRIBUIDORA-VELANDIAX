@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Heart, ShoppingCart } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Heart, Package, ShoppingCart } from 'lucide-react';
 import apiClient from '../../api/axios';
 import { useFavorites } from '../../context/FavoritesContext';
 import type { ProductoResumen } from '../../types/index';
@@ -14,11 +14,31 @@ const HERO_SLIDES = [
   },
   {
     image: 'https://images.unsplash.com/photo-1489987707023-afc824781ef1?q=80&w=2070&auto=format&fit=crop',
-    badge: 'Ventas al por mayor',
+    badge: 'Venta por paca',
     title: 'Impulsa tu Negocio',
-    desc: 'Precios especiales a partir de 6 unidades mezclando como quieras.',
+    desc: 'Elige referencias, colores y tallas para armar tu paca.',
   },
 ];
+
+const TIKTOK_VIDEOS = [
+  {
+    id: '7663884583540133141',
+    url: 'https://www.tiktok.com/@velandiaxsas/video/7663884583540133141?_r=1&_t=ZS-98IsDKl2Asu',
+    title: 'Nuevas referencias',
+  },
+  {
+    id: '7637962229761019156',
+    url: 'https://www.tiktok.com/@velandiaxsas/video/7637962229761019156?_r=1&_t=ZS-98IsDKl2Asu',
+    title: 'Moda Velandiax',
+  },
+  {
+    id: '7634245537587367186',
+    url: 'https://www.tiktok.com/@velandiaxsas/video/7634245537587367186?_r=1&_t=ZS-98IsDKl2Asu',
+    title: 'Contenido de tienda',
+  },
+];
+
+const TIKTOK_PROFILE_URL = 'https://www.tiktok.com/@velandiaxsas?_r=1&_t=ZS-98IsDKl2Asu';
 
 export const HomeView = () => {
   const navigate = useNavigate();
@@ -47,6 +67,21 @@ export const HomeView = () => {
     }, 5000);
 
     return () => clearInterval(sliderInterval);
+  }, []);
+
+  useEffect(() => {
+    const scriptId = 'tiktok-embed-script';
+    const existingScript = document.getElementById(scriptId);
+
+    if (existingScript) {
+      existingScript.remove();
+    }
+
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = 'https://www.tiktok.com/embed.js';
+    script.async = true;
+    document.body.appendChild(script);
   }, []);
 
   const formatearDinero = (monto: number) =>
@@ -129,6 +164,48 @@ export const HomeView = () => {
           ))}
         </div>
       </div>
+
+      <section className="max-w-7xl mx-auto px-4 py-10 md:py-14">
+        <div className="rounded-[2rem] bg-black text-white overflow-hidden grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] shadow-2xl">
+          <div className="p-8 md:p-12">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white text-black px-3 py-1 text-xs font-black uppercase tracking-widest mb-5">
+              <Package size={15} /> Mini seccion
+            </span>
+            <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tight leading-none">
+              Arma tu paca con referencias mixtas
+            </h2>
+            <p className="text-slate-300 mt-5 max-w-xl leading-relaxed">
+              El cliente puede elegir una categoria, entrar a los productos y combinar tallas, colores y cantidades hasta completar la paca.
+            </p>
+            <div className="grid grid-cols-3 gap-3 mt-8 max-w-lg">
+              {['Categoria', 'Producto', 'Paca'].map((step, index) => (
+                <div key={step} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-2xl font-black">{index + 1}</p>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-slate-300 mt-1">{step}</p>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => navigate('/arma-tu-paca')}
+              className="mt-8 bg-white text-black px-7 py-3 rounded-full font-black uppercase tracking-wide hover:bg-slate-200 transition-colors cursor-pointer"
+            >
+              Empezar paca
+            </button>
+          </div>
+          <div className="relative min-h-[280px] bg-slate-900">
+            <img
+              src="https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=1400&auto=format&fit=crop"
+              alt="Arma tu paca"
+              className="absolute inset-0 w-full h-full object-cover opacity-70"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+            <div className="absolute bottom-6 left-6 right-6 rounded-2xl bg-white/90 backdrop-blur p-4 text-black">
+              <p className="text-xs font-black uppercase tracking-widest text-slate-500">Vista rapida</p>
+              <p className="font-black text-lg">Selecciona por categoria y arma tu pedido.</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div className="max-w-7xl mx-auto px-4 py-12 md:py-16 mb-20">
         <div className="flex justify-between items-end mb-8 border-b border-slate-200 pb-4">
@@ -262,6 +339,62 @@ export const HomeView = () => {
           </div>
         )}
       </div>
+
+      <section className="max-w-7xl mx-auto px-4 pb-16">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8 border-b border-slate-200 pb-4">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-slate-900">
+              Videos TikTok
+            </h2>
+            <p className="text-slate-500 mt-1">Muestras para insertar contenido de redes en la tienda.</p>
+          </div>
+          <a
+            href={TIKTOK_PROFILE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm font-black uppercase hover:text-black transition-colors"
+          >
+            Ver TikTok
+          </a>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1.85fr] gap-5 items-stretch">
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm overflow-hidden min-h-[520px]">
+            <blockquote
+              className="tiktok-embed"
+              cite={TIKTOK_PROFILE_URL}
+              data-unique-id="velandiaxsas"
+              data-embed-type="creator"
+              style={{ maxWidth: '780px', minWidth: '288px' }}
+            >
+              <section>
+                <a target="_blank" rel="noreferrer" href={TIKTOK_PROFILE_URL}>
+                  @velandiaxsas
+                </a>
+              </section>
+            </blockquote>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {TIKTOK_VIDEOS.map((video) => (
+              <div key={video.id} className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm overflow-hidden min-h-[520px]">
+                <blockquote
+                  className="tiktok-embed"
+                  cite={video.url}
+                  data-video-id={video.id}
+                  style={{ maxWidth: '605px', minWidth: '288px' }}
+                >
+                  <section>
+                    <a target="_blank" rel="noreferrer" href={video.url}>
+                      {video.title}
+                    </a>
+                  </section>
+                </blockquote>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   );
 };

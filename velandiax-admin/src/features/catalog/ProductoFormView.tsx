@@ -33,7 +33,7 @@ export const ProductoFormView = () => {
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [editingVarianteId, setEditingVarianteId] = useState<number | null>(null);
   const [varianteForm, setVarianteForm] = useState({
-    precio_costo: 0, precio_minorista: 0, precio_mayorista: 0, peso: 0, aplica_paquete: false, estado: 'ACTIVO', id_imagen: null as number | null
+    precio_costo: 0, precio_minorista: 0, precio_mayorista: 0, stock: 0, peso: 0, aplica_paquete: false, estado: 'ACTIVO', id_imagen: null as number | null
   });
   const [atributosDinamicos, setAtributosDinamicos] = useState<{ tipo: string; personalizado: string; valor: string }[]>([]);
 
@@ -110,6 +110,27 @@ export const ProductoFormView = () => {
     finally { setSaving(false); }
   };
 
+  const buscarProductoExistentePorCodigo = async () => {
+    if (isEditing) return;
+    const codigo = producto.codigo_producto.trim().toUpperCase();
+    if (codigo.length < 2) return;
+
+    try {
+      const res = await apiClient.get('/admin/productos', {
+        params: { incluir_inactivos: true, incluir_variantes_inactivas: true },
+      });
+      const existente = res.data.find((p: ProductoDetalle) => p.codigo_producto.toUpperCase() === codigo);
+      if (!existente) return;
+
+      const abrir = window.confirm(
+        `El codigo ${codigo} ya existe en el historial. Deseas abrir ese producto para actualizar su inventario?`
+      );
+      if (abrir) navigate(`/admin/productos/${existente.id_producto}`);
+    } catch (err) {
+      console.error('No fue posible validar el codigo del producto', err);
+    }
+  };
+
   const handleToggleProductoStatus = async () => {
     const nuevoEstado = producto.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
     setProducto({ ...producto, estado: nuevoEstado });
@@ -178,7 +199,7 @@ export const ProductoFormView = () => {
       setEditingVarianteId(v.id_variante);
       setVarianteForm({ 
         precio_costo: v.precio_costo, precio_minorista: v.precio_minorista, precio_mayorista: v.precio_mayorista, 
-        peso: v.peso || 0, aplica_paquete: v.aplica_paquete, estado: v.estado, id_imagen: v.imagenes?.find(img => img.es_principal)?.id_imagen_variante || null
+        stock: v.stock || 0, peso: v.peso || 0, aplica_paquete: v.aplica_paquete, estado: v.estado, id_imagen: v.imagenes?.find(img => img.es_principal)?.id_imagen_variante || null
       });
       const attrs = Object.entries(v.atributos).map(([key, val]) => {
         const isPredefined = ATRIBUTOS_PREDEFINIDOS.includes(key);
@@ -187,7 +208,7 @@ export const ProductoFormView = () => {
       setAtributosDinamicos(attrs);
     } else {
       setEditingVarianteId(null);
-      setVarianteForm({ precio_costo: 0, precio_minorista: 0, precio_mayorista: 0, peso: 0, aplica_paquete: false, estado: 'ACTIVO', id_imagen: null });
+      setVarianteForm({ precio_costo: 0, precio_minorista: 0, precio_mayorista: 0, stock: 0, peso: 0, aplica_paquete: false, estado: 'ACTIVO', id_imagen: null });
       setAtributosDinamicos([]);
     }
     setIsVariantModalOpen(true);
@@ -258,6 +279,7 @@ export const ProductoFormView = () => {
               required
               value={producto.codigo_producto}
               onChange={(e) => setProducto({...producto, codigo_producto: e.target.value.toUpperCase()})}
+              onBlur={buscarProductoExistentePorCodigo}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 font-bold uppercase"
               placeholder="Ej: VX-CAM-001"
             />
@@ -372,9 +394,9 @@ export const ProductoFormView = () => {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-              <thead><tr className="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200"><th className="p-4">SKU / Img</th><th className="p-4">Atributos</th><th className="p-4 text-right">Costo</th><th className="p-4 text-right">Precio</th><th className="p-4 text-center">Activa</th><th className="p-4 text-center">Acciones</th></tr></thead>
+              <thead><tr className="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200"><th className="p-4">SKU / Img</th><th className="p-4">Atributos</th><th className="p-4 text-right">Costo</th><th className="p-4 text-right">Precio</th><th className="p-4 text-center">Stock</th><th className="p-4 text-center">Activa</th><th className="p-4 text-center">Acciones</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
-                {variantes.length === 0 ? (<tr><td colSpan={6} className="p-8 text-center text-slate-500">Agrega tu primera variante.</td></tr>) : (
+                {variantes.length === 0 ? (<tr><td colSpan={7} className="p-8 text-center text-slate-500">Agrega tu primera variante.</td></tr>) : (
                   variantes.map(v => {
                     const variantImage = v.imagenes?.find(i => i.es_principal)?.url || v.imagenes?.[0]?.url;
                     return (
@@ -389,6 +411,7 @@ export const ProductoFormView = () => {
                         </td>
                         <td className="p-4 text-sm flex gap-1 mt-2">{Object.entries(v.atributos).map(([k, val]) => (<span key={k} className="bg-slate-200 px-2 py-1 rounded text-[11px]">{k}: {val}</span>))}</td>
                         <td className="p-4 text-sm text-right">${v.precio_costo}</td><td className="p-4 text-sm text-right text-blue-700">${v.precio_minorista}</td>
+                        <td className="p-4 text-center"><span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${v.stock > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{v.stock}</span></td>
                         <td className="p-4 text-center"><button type="button" onClick={() => handleToggleVarianteStatus(v)} className={`relative inline-flex h-5 w-9 rounded-full ${v.estado === 'ACTIVO' ? 'bg-emerald-500' : 'bg-slate-300'} cursor-pointer`}><span className={`inline-block h-3 w-3 rounded-full bg-white transform transition-transform ${v.estado === 'ACTIVO' ? 'translate-x-5' : 'translate-x-1'} mt-1 ml-0.5`} /></button></td>
                         <td className="p-4 text-center"><button type="button" onClick={() => openVariantModal(v)} className="text-blue-600 font-bold text-xs cursor-pointer bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100">Editar</button></td>
                       </tr>
@@ -447,7 +470,7 @@ export const ProductoFormView = () => {
       {/* NUEVO MODAL DE VARIANTES (MÁS ANCHO Y CON SELECTOR DE IMAGEN) */}
       {isVariantModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden max-h-[90vh] flex flex-col">
+          <div className={`bg-white rounded-2xl shadow-2xl w-full ${editingVarianteId ? 'max-w-2xl' : 'max-w-5xl'} overflow-hidden max-h-[90vh] flex flex-col`}>
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                 {editingVarianteId ? <><Edit size={22} className="text-black"/> Editar Variante #{editingVarianteId}</> : <><Plus size={22} className="text-black"/> Crear Nueva Variante</>}
@@ -456,10 +479,10 @@ export const ProductoFormView = () => {
             </div>
             
             <form onSubmit={handleSaveVariante} className="p-6 overflow-y-auto">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className={`grid grid-cols-1 ${editingVarianteId ? 'gap-6' : 'lg:grid-cols-3 gap-8'}`}>
                 
                 {/* COLUMNA IZQUIERDA: PRECIOS Y ATRIBUTOS */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className={`${editingVarianteId ? '' : 'lg:col-span-2'} space-y-6`}>
                   
                   {/* Precios */}
                   <div>
@@ -471,7 +494,8 @@ export const ProductoFormView = () => {
                   </div>
 
                   {/* Logística */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div><label className="block text-sm font-bold text-slate-700 mb-1">Existencias</label><input type="number" required min="0" step="1" value={varianteForm.stock} onChange={e => setVarianteForm({...varianteForm, stock: Number(e.target.value)})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-slate-400" /></div>
                     <div><label className="block text-sm font-bold text-slate-700 mb-1">Peso Físico (Kg)</label><input type="number" min="0" step="0.01" value={varianteForm.peso} onChange={e => setVarianteForm({...varianteForm, peso: Number(e.target.value)})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-slate-400" /></div>
                     <div className="flex items-center pt-6"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={varianteForm.aplica_paquete} onChange={e => setVarianteForm({...varianteForm, aplica_paquete: e.target.checked})} className="w-5 h-5 text-black rounded" /><span className="text-sm font-bold text-slate-700">Permitir en "Arma tu paca"</span></label></div>
                   </div>
@@ -505,7 +529,7 @@ export const ProductoFormView = () => {
                 </div>
 
                 {/* COLUMNA DERECHA: SELECCIÓN DE IMAGEN DE GALERÍA */}
-                <div className="border-l border-slate-200 pl-8">
+                {!editingVarianteId && <div className="border-l border-slate-200 pl-8">
                   <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-4"><ImagePlus size={16} /> Imagen de la Variante</h4>
                   
                   {imagenes.length === 0 ? (
@@ -545,7 +569,7 @@ export const ProductoFormView = () => {
                       </div>
                     </>
                   )}
-                </div>
+                </div>}
               </div>
 
               {/* Botón de Guardado */}
